@@ -1,40 +1,743 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#f5f8fc">
-  <title>BadmintonHub — Tema Terang & Gelap</title>
-  <style>
-    :root { color-scheme: light; font-family: system-ui, sans-serif; background: #f5f8fc; color: #0f172a; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
-    main { max-width: 560px; padding: 28px; border: 1px solid #dbe4ef; border-radius: 20px; background: white; box-shadow: 0 16px 48px #0f172a12; }
-    h1 { font-size: 1.4rem; margin: 0 0 12px; }
-    p { line-height: 1.6; color: #475569; }
-    a { color: #047857; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>BadmintonHub sedang dimuat…</h1>
-    <p>Menyiapkan materi edukasi dan simulasi bulutangkis.</p>
-    <noscript>Aktifkan JavaScript untuk membuka BadmintonHub.</noscript>
-  </main>
-  <script>
-    (async function () {
-      const source = 'https://raw.githubusercontent.com/winatamandika-hub/tugasasjandika/df8e643eed82137bd12a0d294a3b7dcea1ebeee1/index.html';
-      try {
-        const response = await fetch(source, { cache: 'force-cache' });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        let html = await response.text();
-        html = html.replace('</head>', '<link rel="stylesheet" href="./theme.css"><script src="./theme.js"><\/script></head>');
-        document.open();
-        document.write(html);
-        document.close();
-      } catch (error) {
-        document.querySelector('main').innerHTML = '<h1>BadmintonHub tidak dapat dimuat</h1><p>Periksa koneksi internet, lalu muat ulang halaman. ' + error.message + '</p><p><a href="https://github.com/winatamandika-hub/tugasasjandika">Buka repositori</a></p>';
+<html lang="id" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b1020" />
+    <title>BadmintonHub</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --bg-strong: #0f172a;
+        --bg-soft: #111827;
+        --panel: rgba(15, 23, 42, 0.72);
+        --panel-strong: rgba(15, 23, 42, 0.9);
+        --surface: #111827;
+        --surface-2: #1f2937;
+        --text: #e5eefb;
+        --text-soft: #b4c0d4;
+        --text-muted: #7f8aa6;
+        --line: rgba(255,255,255,0.1);
+        --primary: #34d399;
+        --primary-2: #22c55e;
+        --accent: #60a5fa;
+        --warning: #fbbf24;
+        --danger: #f87171;
+        --shadow: rgba(0, 0, 0, 0.28);
       }
-    }());
-  </script>
-</body>
+
+      html[data-theme="light"] {
+        --bg: #edf4fb;
+        --bg-strong: #f8fbff;
+        --bg-soft: #edf3fa;
+        --panel: rgba(255, 255, 255, 0.9);
+        --panel-strong: rgba(255, 255, 255, 0.95);
+        --surface: #ffffff;
+        --surface-2: #eef6ff;
+        --text: #0f172a;
+        --text-soft: #334155;
+        --text-muted: #64748b;
+        --line: rgba(15, 23, 42, 0.08);
+        --primary: #0ea5a4;
+        --primary-2: #10b981;
+        --accent: #2563eb;
+        --warning: #d97706;
+        --danger: #dc2626;
+        --shadow: rgba(15, 23, 42, 0.08);
+      }
+
+      * { box-sizing: border-box; }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(52, 211, 153, 0.12), transparent 20%),
+          radial-gradient(circle at bottom right, rgba(96, 165, 250, 0.12), transparent 24%),
+          var(--bg);
+        color: var(--text);
+        transition: background 0.25s ease, color 0.25s ease;
+      }
+
+      a { color: inherit; text-decoration: none; }
+      img { max-width: 100%; display: block; }
+
+      .container {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        backdrop-filter: blur(14px);
+        background: rgba(11, 16, 32, 0.7);
+        border-bottom: 1px solid var(--line);
+        transition: background 0.25s ease, border-color 0.25s ease;
+      }
+
+      html[data-theme="light"] header {
+        background: rgba(248, 251, 255, 0.82);
+      }
+
+      .nav-wrap {
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+
+      .brand-mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+        color: #04130f;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        box-shadow: 0 12px 28px rgba(52, 211, 153, 0.26);
+      }
+
+      .brand-name {
+        font-size: 1.03rem;
+      }
+
+      .brand-name strong { color: var(--primary); }
+
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .nav-pills {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 6px;
+      }
+
+      .nav-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        color: var(--text-soft);
+        font-weight: 700;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+      }
+
+      .nav-link.active {
+        background: rgba(52, 211, 153, 0.12);
+        color: var(--text);
+        border: 1px solid rgba(52, 211, 153, 0.25);
+      }
+
+      .theme-toggle {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 12px;
+        min-height: 42px;
+        padding: 0 14px;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+      }
+
+      .theme-toggle:hover {
+        transform: translateY(-1px);
+        border-color: rgba(52, 211, 153, 0.35);
+      }
+
+      .theme-sun, .theme-moon {
+        font-size: 1rem;
+      }
+
+      main {
+        padding: 36px 0 80px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.35fr 0.9fr;
+        gap: 28px;
+        align-items: center;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        padding: 34px;
+        box-shadow: 0 24px 55px var(--shadow);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(52, 211, 153, 0.12);
+        color: var(--primary);
+        border: 1px solid rgba(52, 211, 153, 0.18);
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+
+      .badge-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary);
+        box-shadow: 0 0 0 5px rgba(52, 211, 153, 0.15);
+      }
+
+      h1 {
+        margin: 18px 0 14px;
+        font-size: clamp(2.2rem, 5vw, 4rem);
+        line-height: 1.08;
+        letter-spacing: -0.04em;
+      }
+
+      .gradient-text {
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--text-soft);
+        font-size: 1.04rem;
+        line-height: 1.8;
+        max-width: 60ch;
+      }
+
+      .cta-row {
+        margin-top: 26px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 13px 18px;
+        border-radius: 14px;
+        font-weight: 800;
+        border: 1px solid var(--line);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .btn:hover { transform: translateY(-1px); }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: #04130f;
+        border-color: transparent;
+        box-shadow: 0 16px 30px rgba(52, 211, 153, 0.18);
+      }
+
+      .btn-secondary {
+        background: rgba(255,255,255,0.02);
+        color: var(--text);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+        gap: 14px;
+      }
+
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px 16px;
+        min-height: 120px;
+      }
+
+      .stat-value {
+        font-size: clamp(1.5rem, 2vw, 2.1rem);
+        font-weight: 900;
+        letter-spacing: -0.04em;
+      }
+
+      .stat-card:nth-child(1) .stat-value { color: var(--primary); }
+      .stat-card:nth-child(2) .stat-value { color: var(--accent); }
+      .stat-card:nth-child(3) .stat-value { color: var(--warning); }
+      .stat-card:nth-child(4) .stat-value { color: #f472b6; }
+
+      .stat-label {
+        margin-top: 8px;
+        font-weight: 800;
+      }
+
+      .stat-meta {
+        margin-top: 6px;
+        font-size: 0.74rem;
+        color: var(--text-muted);
+      }
+
+      .section {
+        margin-top: 36px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        padding: 26px 24px;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 18px;
+        margin-bottom: 20px;
+      }
+
+      .kicker {
+        font-size: 0.74rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--primary);
+      }
+
+      h2 {
+        margin: 8px 0 0;
+        font-size: clamp(1.7rem, 3vw, 2.5rem);
+        letter-spacing: -0.04em;
+      }
+
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(200px, 1fr));
+        gap: 18px;
+      }
+
+      .info-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 20px 18px;
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .card-num {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+        background: rgba(96, 165, 250, 0.12);
+        color: var(--accent);
+        border: 1px solid rgba(96, 165, 250, 0.2);
+      }
+
+      .info-card:nth-child(2) .card-num { background: rgba(52, 211, 153, 0.12); color: var(--primary); }
+      .info-card:nth-child(3) .card-num { background: rgba(251, 191, 36, 0.12); color: var(--warning); }
+      .info-card:nth-child(4) .card-num { background: rgba(244, 114, 182, 0.12); color: #ec4899; }
+
+      .info-card h3 {
+        margin: 14px 0 8px;
+        font-size: 1.1rem;
+      }
+
+      .info-card p {
+        margin: 0;
+        color: var(--text-soft);
+        line-height: 1.7;
+        font-size: 0.9rem;
+      }
+
+      .card-footer {
+        margin-top: 16px;
+        padding-top: 10px;
+        border-top: 1px solid var(--line);
+        color: var(--text-muted);
+        font-size: 0.72rem;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .chip {
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        font-weight: 800;
+        border: 1px solid var(--line);
+        color: var(--text-soft);
+        background: rgba(255,255,255,0.01);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 18px;
+      }
+
+      .mini-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 22px;
+      }
+
+      .mini-card ul {
+        margin: 14px 0 0;
+        padding-left: 18px;
+        color: var(--text-soft);
+        line-height: 1.8;
+      }
+
+      .mini-card li + li { margin-top: 6px; }
+
+      .team-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(200px, 1fr));
+        gap: 18px;
+      }
+
+      .person {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 18px;
+      }
+
+      .person-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .avatar {
+        width: 54px;
+        height: 54px;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+        color: #0a0d12;
+        background: linear-gradient(135deg, #fbbf24, #f97316);
+      }
+
+      .person:nth-child(2) .avatar { background: linear-gradient(135deg, #7dd3fc, #2563eb); }
+      .person:nth-child(3) .avatar { background: linear-gradient(135deg, #86efac, #0ea5a4); }
+
+      .person h3 {
+        margin: 0;
+        font-size: 1.04rem;
+      }
+
+      .person-role {
+        display: block;
+        margin-top: 4px;
+        font-size: 0.74rem;
+        color: var(--primary);
+        font-weight: 800;
+      }
+
+      .person p {
+        margin: 0;
+        line-height: 1.7;
+        color: var(--text-soft);
+        font-size: 0.88rem;
+      }
+
+      footer {
+        margin-top: 36px;
+        padding: 20px 0 6px;
+        color: var(--text-muted);
+        text-align: center;
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 960px) {
+        .hero, .grid-2, .team-grid, .card-grid { grid-template-columns: 1fr 1fr; }
+        .hero { grid-template-columns: 1fr; }
+        .stats { grid-template-columns: repeat(2, 1fr); }
+      }
+
+      @media (max-width: 640px) {
+        .nav-wrap { flex-wrap: wrap; padding: 10px 0; }
+        .nav-actions { width: 100%; justify-content: space-between; }
+        .nav-pills { width: 100%; justify-content: space-between; }
+        .nav-link { flex: 1; justify-content: center; }
+        .section-head { flex-direction: column; align-items: start; }
+        .hero, .section { padding: 18px; }
+        .card-grid, .grid-2, .team-grid, .stats { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container nav-wrap">
+        <div class="brand" aria-label="BadmintonHub">
+          <div class="brand-mark">B</div>
+          <div class="brand-name">BADMINTON<strong>HUB</strong></div>
+        </div>
+
+        <div class="nav-actions">
+          <nav class="nav-pills" aria-label="Navigasi utama">
+            <a class="nav-link active" href="#home">Materi</a>
+            <a class="nav-link" href="#teknik">Teknik</a>
+            <a class="nav-link" href="#profil">Profil</a>
+          </nav>
+
+          <button class="theme-toggle" id="themeToggle" type="button" aria-label="Ganti tema">
+            <span class="theme-sun" aria-hidden="true">☀️</span>
+            <span class="theme-label">Terang</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="home">
+      <div class="container">
+        <section class="hero">
+          <div>
+            <div class="badge">
+              <span class="badge-dot"></span>
+              Platform Edukasi & Simulasi 3D • Oleh Andika
+            </div>
+
+            <h1>
+              Kuasai Teori & Praktik
+              <span class="gradient-text">Bulutangkis Modern</span>
+            </h1>
+
+            <p class="subtitle">
+              Selamat datang di <strong>BadmintonHub</strong> — portal pembelajaran bulutangkis terpadu yang
+              menggabungkan aturan BWF, teknik pukulan, strategi permainan, dan simulasi interaktif untuk
+              membantu Anda memahami olahraga dengan lebih mudah.
+            </p>
+
+            <div class="cta-row">
+              <a href="#teknik" class="btn btn-primary">Mulai Belajar</a>
+              <a href="#profil" class="btn btn-secondary">Lihat Profil Atlet</a>
+            </div>
+          </div>
+
+          <div class="stats" aria-label="Statistik ringkas">
+            <div class="stat-card">
+              <div class="stat-value">13.4m</div>
+              <div class="stat-label">Panjang Lapangan</div>
+              <div class="stat-meta">Standar BWF & PBSI</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">3 × 21</div>
+              <div class="stat-label">Sistem Rally</div>
+              <div class="stat-meta">Skor maksimal 30</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">1.55m</div>
+              <div class="stat-label">Tinggi Net</div>
+              <div class="stat-meta">Tengah lapangan</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">4.74g</div>
+              <div class="stat-label">Berat Kok</div>
+              <div class="stat-meta">16 helai bulu</div>
+            </div>
+          </div>
+        </section>
+
+        <section id="teknik" class="section">
+          <div class="section-head">
+            <div>
+              <div class="kicker">Kurikulum Terpadu</div>
+              <h2>Pembelajaran & Teknik Bulutangkis</h2>
+            </div>
+            <div class="chip-row">
+              <span class="chip">Teknik Pukulan</span>
+              <span class="chip">Ukuran Lapangan</span>
+              <span class="chip">Aturan & Sejarah</span>
+            </div>
+          </div>
+
+          <div class="card-grid">
+            <article class="info-card">
+              <div>
+                <div class="card-num">01</div>
+                <h3>Lob / Clear</h3>
+                <p>Pukulan melambung tinggi untuk memaksa lawan bergerak mundur dan memberi ruang recovery.</p>
+              </div>
+              <div class="card-footer">Di simulasi: Tombol J / Spasi</div>
+            </article>
+
+            <article class="info-card">
+              <div>
+                <div class="card-num">02</div>
+                <h3>Drop Shot</h3>
+                <p>Pukulan halus yang menukik dekat net agar lawan kesulitan menanggapi dengan cepat.</p>
+              </div>
+              <div class="card-footer">Di simulasi: Tombol K / Shift</div>
+            </article>
+
+            <article class="info-card">
+              <div>
+                <div class="card-num">03</div>
+                <h3>Jumping Smash</h3>
+                <p>Pukulan eksplosif saat melompat untuk menghantam kok ke area lawan dengan kecepatan tinggi.</p>
+              </div>
+              <div class="card-footer">Di simulasi: Tombol L / Enter</div>
+            </article>
+
+            <article class="info-card">
+              <div>
+                <div class="card-num">04</div>
+                <h3>Grip & Footwork</h3>
+                <p>Penguasaan pegangan forehand dan backhand sekaligus gerak kaki untuk menjaga posisi.</p>
+              </div>
+              <div class="card-footer">Di simulasi: WASD / Joystick</div>
+            </article>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="grid-2">
+            <div class="mini-card">
+              <div class="kicker">Spesifikasi Lapangan</div>
+              <h2>Ukuran Standar BWF</h2>
+              <ul>
+                <li><strong>Nomor tunggal:</strong> 13,40 m × 5,18 m.</li>
+                <li><strong>Nomor ganda:</strong> 13,40 m × 6,10 m.</li>
+                <li><strong>Tinggi net tengah:</strong> 1,524 m.</li>
+                <li><strong>Garis servis pendek:</strong> 1,98 m dari net.</li>
+              </ul>
+            </div>
+
+            <div class="mini-card">
+              <div class="kicker">Aturan Utama</div>
+              <h2>Sistem Skor</h2>
+              <ul>
+                <li><strong>Rally point:</strong> tiap reli menghasilkan 1 poin.</li>
+                <li><strong>Deuce:</strong> 20-20 harus unggul 2 poin.</li>
+                <li><strong>Servis:</strong> skor genap kanan, ganjil kiri.</li>
+                <li><strong>Fault:</strong> kok keluar, menyangkut net, atau dipukul dua kali.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="profil" class="section">
+          <div class="section-head">
+            <div>
+              <div class="kicker">Hall of Fame</div>
+              <h2>Profil Atlet Bulutangkis</h2>
+            </div>
+          </div>
+
+          <div class="team-grid">
+            <article class="person">
+              <div class="person-head">
+                <div class="avatar">SS</div>
+                <div>
+                  <h3>Susy Susanti</h3>
+                  <span class="person-role">Tunggal Putri</span>
+                </div>
+              </div>
+              <p>Peraih medali emas Olimpiade pertama Indonesia, dikenal dengan kelenturan, ketenangan, dan permainan yang tajam.</p>
+            </article>
+
+            <article class="person">
+              <div class="person-head">
+                <div class="avatar">TH</div>
+                <div>
+                  <h3>Taufik Hidayat</h3>
+                  <span class="person-role">Tunggal Putra</span>
+                </div>
+              </div>
+              <p>Legenda backhand smash, dikenal dengan teknik net super tipis dan presisi yang sulit dibaca lawan.</p>
+            </article>
+
+            <article class="person">
+              <div class="avatar">MK</div>
+              <div>
+                <h3>Marcus Gideon</h3>
+                <span class="person-role">Ganda Putra</span>
+              </div>
+              <p>Atlet fenomenal dengan akurasi pukulan, stamina, dan kerja sama tim yang kuat di lapangan.</p>
+            </article>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      BadmintonHub © 2026 — Edukasi & Simulasi Bulutangkis
+    </footer>
+
+    <script>
+      (function () {
+        const root = document.documentElement;
+        const toggle = document.getElementById('themeToggle');
+        const label = toggle.querySelector('.theme-label');
+        const icon = toggle.querySelector('.theme-sun');
+
+        const storedTheme = localStorage.getItem('badmintonhub-theme');
+        const preferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        const initialTheme = storedTheme || preferred;
+
+        function applyTheme(theme) {
+          root.setAttribute('data-theme', theme);
+          localStorage.setItem('badmintonhub-theme', theme);
+
+          if (theme === 'light') {
+            label.textContent = 'Gelap';
+            icon.textContent = '🌙';
+          } else {
+            label.textContent = 'Terang';
+            icon.textContent = '☀️';
+          }
+        }
+
+        applyTheme(initialTheme);
+
+        toggle.addEventListener('click', function () {
+          const nextTheme = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+          applyTheme(nextTheme);
+        });
+      })();
+    </script>
+  </body>
 </html>
