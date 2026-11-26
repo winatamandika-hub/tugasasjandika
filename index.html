@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>BadmintonHub & SmashMaster 3D — Oleh Andika</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Cannon.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+            --bg-main: #090d16;
+            --text-main: #f8fafc;
+            --text-muted: #cbd5e1;
+            --card-bg: rgba(15, 23, 42, 0.78);
+            --card-border: rgba(255, 255, 255, 0.12);
+        }
+        body.light-mode {
+            --bg-main: #f1f5f9;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --card-bg: rgba(255, 255, 255, 0.88);
+            --card-border: rgba(15, 23, 42, 0.12);
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100%;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        body.mode-materi {
+            overflow-x: hidden;
+            overflow-y: auto;
+            position: relative;
+        }
+        body.mode-simulasi {
+            overflow: hidden;
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100dvh;
+            touch-action: none;
+            overscroll-behavior: none;
+        }
+        #game-container {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100dvh;
+            z-index: 1;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        .font-mono-score {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .glass-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.35);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        .glass-pill {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--card-border);
+        }
+        /* Adaptasi Light Mode untuk Halaman Materi & HUD */
+        body.light-mode #top-navbar {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-bottom-color: rgba(15, 23, 42, 0.1);
+        }
+        body.light-mode .text-white { color: #0f172a; }
+        body.light-mode .text-slate-300,
+        body.light-mode .text-slate-400 { color: #475569; }
+        body.light-mode .bg-slate-900\/70,
+        body.light-mode .bg-slate-900\/80,
+        body.light-mode .bg-slate-950\/65,
+        body.light-mode .bg-slate-950\/75 {
+            background-color: rgba(241, 245, 249, 0.88);
+        }
+        body.light-mode .bg-white\/5 {
+            background-color: rgba(15, 23, 42, 0.05);
+        }
+        body.light-mode .border-white\/10 {
+            border-color: rgba(15, 23, 42, 0.12);
+        }
+
+        @keyframes popBanner {
+            0% { transform: translate(-50%, -40%) scale(0.6); opacity: 0; }
+            25% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+            80% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -65%) scale(0.95); opacity: 0; }
+        }
+        .banner-animate {
+            animation: popBanner 1.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .btn-glow {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.5);
+        }
+        .btn-glow:active {
+            transform: translateY(1px);
+        }
+        /* Virtual Joystick untuk HP / Layar Sentuh (Responsif & Multi-Touch) */
+        #joystick-zone {
+            width: clamp(104px, 24vw, 134px);
+            height: clamp(104px, 24vw, 134px);
+            border-radius: 9999px;
+            background: rgba(15, 23, 42, 0.45);
+            border: 2px solid rgba(56, 189, 248, 0.45);
+            position: relative;
+            touch-action: none;
+            backdrop-filter: blur(6px);
+        }
+        #joystick-knob {
+            width: 44%;
+            height: 44%;
+            border-radius: 9999px;
+            background: radial-gradient(circle at 30% 30%, #38bdf8, #0284c7);
+            box-shadow: 0 4px 16px rgba(2, 132, 199, 0.7);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: transform 0.04s linear;
+        }
+        .mobile-action-btn {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .mobile-action-btn:active, .mobile-action-btn.is-pressed {
+            transform: scale(0.91);
+            filter: brightness(1.2);
+        }
+        @keyframes tiltPhone {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-90deg); }
+        }
+        .animate-tilt {
+            animation: tiltPhone 2.2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="mode-materi">
+
+    <!-- ========================================================================
+         NAVIGASI UTAMA TERPADU (PERSISTENT TOP NAVBAR + SAFE AREA)
+         ======================================================================== -->
+    <header id="top-navbar" style="padding-top: var(--safe-top);" class="fixed top-0 left-0 right-0 z-50 bg-slate-950/85 backdrop-blur-xl border-b border-white/10 transition-all">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
+            
+            <!-- Brand & Identitas Pembuat -->
+            <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchPage('MATERI')">
+                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-slate-950 font-extrabold shadow-lg shadow-emerald-500/20 shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div class="leading-tight">
+                    <div class="font-extrabold text-sm sm:text-base tracking-tight text-white">BADMINTON<span class="text-emerald-400">HUB</span></div>
+                    <div class="text-[10px] text-slate-400 font-medium hidden sm:block">Oleh <span class="text-emerald-300 font-bold">Andika</span></div>
+                </div>
+            </div>
+
+            <!-- Switcher Halaman 1 (Materi) & Halaman 2 (Simulasi 3D) -->
+            <nav class="flex items-center bg-white/5 p-1 rounded-2xl border border-white/10">
+                <button id="nav-btn-materi" onclick="switchPage('MATERI')" class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 bg-emerald-500 text-slate-950 shadow-md">
+                    <span>1. Pusat Materi</span>
+                </button>
+                <button id="nav-btn-simulasi" onclick="switchPage('SIMULASI')" class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white">
+                    <span>2. Simulasi 3D</span>
+                </button>
+            </nav>
+
+            <!-- Tombol Mode Gelap / Terang -->
+            <button id="btn-theme-toggle" onclick="toggleTheme()" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold flex items-center gap-1.5 transition shrink-0" title="Ganti Tema Gelap / Terang">
+                <svg id="icon-sun" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                <svg id="icon-moon" class="w-4 h-4 text-sky-400 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                <span id="theme-label" class="hidden md:inline text-slate-300">Terang</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ========================================================================
+         HALAMAN 1: PUSAT MATERI, PEMBELAJARAN, TURNAMEN, ATLET & KUIS
+         ======================================================================== -->
+    <main id="page-materi" style="padding-top: calc(5rem + var(--safe-top)); padding-bottom: calc(3rem + var(--safe-bottom));" class="max-w-7xl mx-auto px-4 sm:px-6 space-y-12">
+
+        <!-- 1. HERO & PENGENALAN WEB -->
+        <section class="glass-panel rounded-3xl p-6 sm:p-10 relative overflow-hidden">
+            <div class="absolute -top-28 -right-28 w-72 h-72 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-28 -left-28 w-72 h-72 bg-sky-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="relative z-10 max-w-3xl">
+                <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-400 text-xs font-bold mb-4">
+                    <span>Platform Edukasi & Simulasi Interaktif • Karya <strong class="underline">Andika</strong></span>
+                </div>
+                <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight mb-4">
+                    Pelajari Teori Bulutangkis & Praktikkan di <span class="text-emerald-400">Arena 3D</span>
+                </h1>
+                <p class="text-slate-300 text-sm sm:text-base leading-relaxed mb-7">
+                    Selamat datang di <strong>BadmintonHub</strong>. Portal terpadu ini menyajikan ensiklopedia standar BWF, teknik dasar pukulan, kalender kejuaraan bergengsi, profil atlet kebanggaan Indonesia, serta arena simulasi game 3D interaktif yang dioptimalkan untuk HP maupun PC.
+                </p>
+                <div class="flex flex-wrap gap-3">
+                    <a href="#modul-pembelajaran" class="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 font-bold text-sm text-white transition">
+                        Mulai Belajar Materi
+                    </a>
+                    <button onclick="switchPage('SIMULASI')" class="btn-glow px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-extrabold text-sm shadow-lg cursor-pointer">
+                        Mainkan Simulasi 3D →
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistik Standar BWF -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-8 pt-8 border-t border-white/10">
+                <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Ukuran Lapangan</div>
+                    <div class="font-mono-score text-lg sm:text-xl font-extrabold text-emerald-400 mt-1">13,4m × 6,1m</div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Tinggi Net Tengah</div>
+                    <div class="font-mono-score text-lg sm:text-xl font-extrabold text-sky-400 mt-1">1,524 Meter</div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Sistem Skor BWF</div>
+                    <div class="font-mono-score text-lg sm:text-xl font-extrabold text-amber-400 mt-1">3 × 21 Poin</div>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                    <div class="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Bulu Kok Standar</div>
+                    <div class="font-mono-score text-lg sm:text-xl font-extrabold text-rose-400 mt-1">16 Helai</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. MODUL PEMBELAJARAN TERPADU -->
+        <section id="modul-pembelajaran" class="space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Modul Pembelajaran Terpadu</h2>
+                    <p class="text-slate-400 text-sm">Pahami aturan resmi BWF, geometri lapangan, dan jenis pukulan dasar.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Diagram SVG Ukuran Lapangan BWF -->
+                <div class="lg:col-span-5 glass-panel rounded-3xl p-5 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-base text-white mb-1">Diagram Standar Lapangan BWF</h3>
+                        <p class="text-xs text-slate-400 mb-4">Perbedaan batas area permainan Tunggal (Singles) dan Ganda (Doubles).</p>
+                    </div>
+                    <div class="bg-teal-900/60 border border-teal-400/30 rounded-2xl p-4 flex items-center justify-center">
+                        <svg viewBox="0 0 260 440" class="w-full max-w-[230px] h-auto">
+                            <!-- Karpet Luar -->
+                            <rect x="10" y="10" width="240" height="420" rx="6" fill="#0d9488" stroke="#f8fafc" stroke-width="3"/>
+                            <!-- Garis Singles -->
+                            <line x1="28" y1="10" x2="28" y2="430" stroke="#f8fafc" stroke-width="2"/>
+                            <line x1="232" y1="10" x2="232" y2="430" stroke="#f8fafc" stroke-width="2"/>
+                            <!-- Garis Servis Panjang Ganda -->
+                            <line x1="10" y1="34" x2="250" y2="34" stroke="#f8fafc" stroke-width="2"/>
+                            <line x1="10" y1="406" x2="250" y2="406" stroke="#f8fafc" stroke-width="2"/>
+                            <!-- Garis Servis Pendek -->
+                            <line x1="10" y1="158" x2="250" y2="158" stroke="#f8fafc" stroke-width="2"/>
+                            <line x1="10" y1="282" x2="250" y2="282" stroke="#f8fafc" stroke-width="2"/>
+                            <!-- Garis Tengah -->
+                            <line x1="130" y1="10" x2="130" y2="158" stroke="#f8fafc" stroke-width="2"/>
+                            <line x1="130" y1="282" x2="130" y2="430" stroke="#f8fafc" stroke-width="2"/>
+                            <!-- Net -->
+                            <line x1="4" y1="220" x2="256" y2="220" stroke="#facc15" stroke-width="4" stroke-dasharray="6,4"/>
+                            <text x="130" y="213" fill="#fef08a" font-size="11" font-weight="bold" text-anchor="middle">NET (1,524 m)</text>
+                            <text x="130" y="95" fill="#ffffff" font-size="10" text-anchor="middle" opacity="0.85">Area Lawan (Bot AI)</text>
+                            <text x="130" y="348" fill="#ffffff" font-size="10" text-anchor="middle" opacity="0.85">Area Pemain (6,70 m)</text>
+                        </svg>
+                    </div>
+                    <div class="mt-4 text-xs text-slate-300 space-y-1">
+                        <div>• <strong>Tunggal (Singles):</strong> Lebar 5,18 m × Panjang 13,40 m.</div>
+                        <div>• <strong>Ganda (Doubles):</strong> Lebar 6,10 m × Panjang 13,40 m.</div>
+                    </div>
+                </div>
+
+                <!-- Kartu Teknik Pukulan Dasar -->
+                <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="glass-panel rounded-2xl p-5">
+                        <span class="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 text-xs font-bold">Tombol [J / LOB]</span>
+                        <h3 class="font-bold text-lg text-white mt-3 mb-1.5">1. Pukulan Lob / Clear</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Pukulan melambung tinggi menuju garis belakang lapangan lawan. Berfungsi untuk mengulur waktu kembali ke posisi tengah (<em>base position</em>) dan menekan lawan ke belakang.
+                        </p>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-5">
+                        <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-bold">Tombol [K / DROP]</span>
+                        <h3 class="font-bold text-lg text-white mt-3 mb-1.5">2. Drop Shot</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Pukulan tipuan dari area belakang yang diarahkan jatuh menukik tipis tepat di depan net lawan, memaksa lawan berlari cepat ke depan.
+                        </p>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-5">
+                        <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-bold">Tombol [L / SMASH]</span>
+                        <h3 class="font-bold text-lg text-white mt-3 mb-1.5">3. Jumping Smash</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Pukulan serangan paling mematikan dengan kekuatan penuh dan sudut menukik tajam ke bawah saat kok berada di titik tertinggi.
+                        </p>
+                    </div>
+                    <div class="glass-panel rounded-2xl p-5">
+                        <span class="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 text-xs font-bold">Dasar Pergerakan</span>
+                        <h3 class="font-bold text-lg text-white mt-3 mb-1.5">4. Grip & Footwork</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Menggunakan pegangan <strong>Forehand</strong> (seperti berjabat tangan) dan <strong>Backhand</strong> (ibu jari menekan sisi lebar grip) dipadu langkah kaki lincah dari titik tengah.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. KALENDER & INFO KEJUARAAN (LOMBA) -->
+        <section class="space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Kejuaraan & Turnamen Resmi</h2>
+                    <p class="text-slate-400 text-sm">Kompetisi bergengsi tingkat dunia maupun nasional Indonesia.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="filterTurnamen('ALL')" class="tour-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950">Semua</button>
+                    <button onclick="filterTurnamen('DUNIA')" class="tour-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white/10 text-slate-300">Dunia (BWF)</button>
+                    <button onclick="filterTurnamen('NASIONAL')" class="tour-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white/10 text-slate-300">Nasional (PBSI)</button>
+                </div>
+            </div>
+
+            <div id="turnamen-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div data-cat="DUNIA" class="tour-card glass-panel rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300">Grade 1 BWF</span>
+                        <span class="text-xs text-slate-400">Tahunan</span>
+                    </div>
+                    <h3 class="font-bold text-base text-white">BWF World Championships</h3>
+                    <p class="text-xs text-slate-300 mt-1.5">Kejuaraan Dunia bulu tangkis perorangan paling prestisius untuk memperebutkan gelar Juara Dunia.</p>
+                </div>
+                <div data-cat="DUNIA" class="tour-card glass-panel rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300">Super 1000</span>
+                        <span class="text-xs text-slate-400">Maret • Inggris</span>
+                    </div>
+                    <h3 class="font-bold text-base text-white">All England Open</h3>
+                    <p class="text-xs text-slate-300 mt-1.5">Turnamen bulu tangkis tertua di dunia (sejak 1899) yang digelar di Utilita Arena Birmingham.</p>
+                </div>
+                <div data-cat="DUNIA" class="tour-card glass-panel rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">Beregu Dunia</span>
+                        <span class="text-xs text-slate-400">2 Tahun Sekali</span>
+                    </div>
+                    <h3 class="font-bold text-base text-white">Thomas & Uber Cup</h3>
+                    <p class="text-xs text-slate-300 mt-1.5">Piala dunia beregu putra (Thomas Cup) dan beregu putri (Uber Cup) antarnegara.</p>
+                </div>
+                <div data-cat="NASIONAL" class="tour-card glass-panel rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300">Super 1000 • Jakarta</span>
+                        <span class="text-xs text-slate-400">Istora Senayan</span>
+                    </div>
+                    <h3 class="font-bold text-base text-white">Indonesia Open</h3>
+                    <p class="text-xs text-slate-300 mt-1.5">Turnamen kelas tertinggi BWF World Tour di Indonesia yang terkenal dengan atmosfer suporter Istora.</p>
+                </div>
+                <div data-cat="NASIONAL" class="tour-card glass-panel rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300">Pembinaan PBSI</span>
+                        <span class="text-xs text-slate-400">Seri Nasional</span>
+                    </div>
+                    <h3 class="font-bold text-base text-white">Sirkuit Nasional (Sirnas)</h3>
+                    <p class="text-xs text-slate-300 mt-1.5">Ajang penjaringan bibit atlet muda berbakat dari berbagai klub bulu tangkis di seluruh provinsi.</p>
+                </div>
+                <div data-cat="NASIONAL" class="tour-card glass-panel rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300">Tingkat Pelajar</span>
+                        <span class="text-xs text-slate-400">Kemendikbud / Kemenpora</span>
+                    </div>
+                    <h3 class="font-bold text-base text-white">O2SN & POPNAS</h3>
+                    <p class="text-xs text-slate-300 mt-1.5">Olimpiade Olahraga Siswa Nasional dan Pekan Olahraga Pelajar Nasional untuk atlet pelajar Indonesia.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. PROFIL ATLET BULUTANGKIS INDONESIA -->
+        <section class="space-y-5">
+            <div>
+                <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Atlet Kebanggaan Indonesia</h2>
+                <p class="text-slate-400 text-sm">Para legenda dan bintang aktif yang mengharumkan nama Indonesia di panggung dunia.</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="glass-panel rounded-2xl p-5">
+                    <div class="text-xs font-bold text-emerald-400 uppercase">Tunggal Putra • Legenda</div>
+                    <h3 class="font-extrabold text-lg text-white mt-1">Taufik Hidayat</h3>
+                    <p class="text-xs text-slate-300 mt-2">Peraih Emas Olimpiade Athena 2004 & Juara Dunia 2005. Dikenal memiliki pukulan <em>Backhand Smash</em> tercepat di dunia.</p>
+                </div>
+                <div class="glass-panel rounded-2xl p-5">
+                    <div class="text-xs font-bold text-emerald-400 uppercase">Tunggal Putri • Legenda</div>
+                    <h3 class="font-extrabold text-lg text-white mt-1">Susy Susanti</h3>
+                    <p class="text-xs text-slate-300 mt-2">Peraih medali emas Olimpiade pertama bagi Indonesia pada Olimpiade Barcelona 1992 serta 4 kali juara All England.</p>
+                </div>
+                <div class="glass-panel rounded-2xl p-5">
+                    <div class="text-xs font-bold text-sky-400 uppercase">Tunggal Putra • Aktif</div>
+                    <h3 class="font-extrabold text-lg text-white mt-1">Jonatan Christie</h3>
+                    <p class="text-xs text-slate-300 mt-2">Juara All England 2024, Juara Asia 2024, dan peraih medali emas Asian Games 2018 dengan gaya main reli menyerang.</p>
+                </div>
+                <div class="glass-panel rounded-2xl p-5">
+                    <div class="text-xs font-bold text-sky-400 uppercase">Tunggal Putra • Aktif</div>
+                    <h3 class="font-extrabold text-lg text-white mt-1">Anthony Sinisuka Ginting</h3>
+                    <p class="text-xs text-slate-300 mt-2">Peraih perunggu Olimpiade Tokyo 2020 dan Juara Asia 2023 yang terkenal dengan kecepatan <em>footwork</em> dan <em>netting</em> tajam.</p>
+                </div>
+                <div class="glass-panel rounded-2xl p-5">
+                    <div class="text-xs font-bold text-amber-400 uppercase">Ganda Putra • Ikonik</div>
+                    <h3 class="font-extrabold text-lg text-white mt-1">Marcus Gideon / Kevin Sanjaya</h3>
+                    <p class="text-xs text-slate-300 mt-2">Dijuluki "The Minions", memegang rekor peringkat 1 dunia BWF terlama lebih dari 200 pekan berturut-turut.</p>
+                </div>
+                <div class="glass-panel rounded-2xl p-5">
+                    <div class="text-xs font-bold text-rose-400 uppercase">Tunggal Putri • Aktif</div>
+                    <h3 class="font-extrabold text-lg text-white mt-1">Gregoria Mariska Tunjung</h3>
+                    <p class="text-xs text-slate-300 mt-2">Peraih medali perunggu Olimpiade Paris 2024 dan Juara Dunia Junior 2017 dengan variasi pukulan tipuan akurat.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. KUIS INTERAKTIF UJI PEMAHAMAN -->
+        <section class="glass-panel rounded-3xl p-6 sm:p-8">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-extrabold text-white">Kuis Cepat Pengetahuan Bulutangkis</h2>
+                    <p class="text-xs sm:text-sm text-slate-400">Uji pemahamanmu sebelum masuk ke arena pertandingan 3D!</p>
+                </div>
+                <div id="quiz-score-badge" class="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
+                    Skor Kuis: 0 / 3
+                </div>
+            </div>
+            <div id="quiz-container" class="space-y-5"></div>
+        </section>
+
+        <!-- FOOTER HALAMAN MATERI -->
+        <footer class="text-center text-xs text-slate-400 pt-4 pb-6 border-t border-white/10">
+            BadmintonHub & SmashMaster 3D — Dirancang & Dikembangkan oleh <strong class="text-emerald-400">Andika</strong>
+        </footer>
+    </main>
+
+    <!-- ========================================================================
+         HALAMAN 2: ARENA SIMULASI GAME BULUTANGKIS 3D (HP & PC OPTIMIZED)
+         ======================================================================== -->
+    <section id="page-simulasi" class="hidden fixed inset-0 z-10">
+        
+        <!-- Container Utama WebGL -->
+        <div id="game-container"></div>
+
+        <!-- Banner Saran Mode Landscape Khusus HP Portrait -->
+        <div id="portrait-hint" style="top: calc(4.2rem + var(--safe-top));" class="fixed left-1/2 -translate-x-1/2 z-30 md:hidden pointer-events-none hidden">
+            <div class="glass-pill px-3.5 py-1.5 rounded-full flex items-center gap-2 text-[11px] font-semibold text-amber-300 border-amber-400/40 shadow-lg whitespace-nowrap">
+                <svg class="w-4 h-4 animate-tilt shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                <span>Putar HP ke Landscape untuk pandangan lebih luas</span>
+            </div>
+        </div>
+
+        <!-- HUD / Antarmuka Saat Bermain -->
+        <div id="hud-layer" style="padding-top: calc(4rem + var(--safe-top)); padding-bottom: calc(0.75rem + var(--safe-bottom)); padding-left: calc(0.75rem + var(--safe-left)); padding-right: calc(0.75rem + var(--safe-right));" class="fixed inset-0 z-10 pointer-events-none flex flex-col justify-between hidden">
+            
+            <!-- Bagian Atas HUD: Papan Skor & Kontrol Utilitas -->
+            <div class="flex items-start justify-between w-full max-w-6xl mx-auto gap-2">
+                
+                <!-- Papan Skor Real-Time -->
+                <div class="glass-panel rounded-2xl px-3.5 py-2 sm:px-6 sm:py-3 flex items-center gap-3 sm:gap-6 pointer-events-auto">
+                    <div class="flex items-center gap-2 sm:gap-3">
+                        <div class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-sky-400 shadow-[0_0_12px_#38bdf8]"></div>
+                        <div>
+                            <div class="text-[10px] sm:text-[11px] uppercase tracking-wider text-sky-300 font-bold flex items-center gap-1.5">
+                                PLAYER
+                                <span id="serve-badge-player" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                            </div>
+                            <div id="score-player" class="font-mono-score text-xl sm:text-3xl font-extrabold text-white leading-none mt-0.5">0</div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col items-center px-2 border-x border-white/10">
+                        <span class="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400">TARGET</span>
+                        <span id="target-points-display" class="font-mono-score text-xs font-bold text-emerald-400">21</span>
+                        <span id="rally-counter" class="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">Reli: 0</span>
+                    </div>
+
+                    <div class="flex items-center gap-2 sm:gap-3 text-right">
+                        <div>
+                            <div class="text-[10px] sm:text-[11px] uppercase tracking-wider text-rose-300 font-bold flex items-center justify-end gap-1.5">
+                                <span id="serve-badge-bot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse hidden"></span>
+                                BOT AI
+                            </div>
+                            <div id="score-bot" class="font-mono-score text-xl sm:text-3xl font-extrabold text-white leading-none mt-0.5">0</div>
+                        </div>
+                        <div class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-rose-500 shadow-[0_0_12px_#f43f5e]"></div>
+                    </div>
+                </div>
+
+                <!-- Tombol Kamera, Suara, & Pengaturan -->
+                <div class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
+                    <button id="btn-camera" onclick="toggleCameraMode()" class="glass-pill hover:bg-white/10 text-xs sm:text-sm font-semibold p-2.5 sm:px-3.5 sm:py-2.5 rounded-xl flex items-center gap-2 transition" title="Ganti Sudut Kamera (C)">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        <span class="hidden sm:inline" id="camera-label">Kamera: Belakang</span>
+                    </button>
+                    <button id="btn-sound" onclick="toggleMute()" class="glass-pill hover:bg-white/10 p-2.5 rounded-xl transition" title="Suara On/Off (M)">
+                        <svg id="icon-sound-on" class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                        <svg id="icon-sound-off" class="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>
+                    </button>
+                    <button onclick="returnToMenu()" class="glass-pill hover:bg-rose-500/20 hover:border-rose-500/40 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl transition" title="Pengaturan Match (Esc)">
+                        Setup
+                    </button>
+                </div>
+            </div>
+
+            <!-- Banner Feedback Dinamis -->
+            <div id="feedback-container" class="fixed top-1/3 left-1/2 pointer-events-none z-20"></div>
+
+            <!-- Prompt Servis (Adaptif teks HP vs PC) -->
+            <div id="serve-prompt" class="self-center glass-pill px-4 py-2 rounded-full text-xs sm:text-sm font-semibold text-amber-300 border-amber-400/30 shadow-lg animate-bounce hidden">
+                <span class="hidden md:inline">Tekan <span class="px-1.5 py-0.5 bg-white/15 rounded text-white font-mono">SPASI</span> / <span class="px-1.5 py-0.5 bg-white/15 rounded text-white font-mono">J</span> untuk Servis!</span>
+                <span class="md:hidden">Ketuk tombol <span class="px-1.5 py-0.5 bg-sky-500/40 rounded text-white font-bold">LOB</span> untuk Servis!</span>
+            </div>
+
+            <!-- KONTROL VIRTUAL KHUSUS HP / LAYAR SENTUH (Multi-Touch Ready) -->
+            <div id="mobile-touch-controls" class="flex md:hidden items-end justify-between w-full px-1 pb-1 pointer-events-none">
+                <!-- Analog Virtual Joystick di Kiri -->
+                <div id="joystick-zone" class="pointer-events-auto shadow-2xl">
+                    <div id="joystick-knob"></div>
+                </div>
+
+                <!-- 3 Tombol Pukulan Ergonomis di Kanan -->
+                <div class="flex items-end gap-2.5 pointer-events-auto">
+                    <button type="button" data-shot="DROP" class="mobile-action-btn w-[60px] h-[60px] rounded-full bg-emerald-600/90 border-2 border-emerald-300 text-white font-extrabold text-[11px] shadow-lg flex flex-col items-center justify-center">
+                        <span>DROP</span>
+                        <span class="text-[9px] font-normal opacity-85">Tipis</span>
+                    </button>
+                    <button type="button" data-shot="CLEAR" class="mobile-action-btn w-[66px] h-[66px] rounded-full bg-sky-600/90 border-2 border-sky-300 text-white font-extrabold text-xs shadow-lg flex flex-col items-center justify-center">
+                        <span>LOB</span>
+                        <span class="text-[9px] font-normal opacity-85">Tinggi</span>
+                    </button>
+                    <button type="button" data-shot="SMASH" class="mobile-action-btn w-[74px] h-[74px] rounded-full bg-amber-500/95 border-2 border-amber-200 text-slate-950 font-black text-xs shadow-xl flex flex-col items-center justify-center mb-1">
+                        <span>SMASH</span>
+                        <span class="text-[9px] font-bold opacity-85">Kuat!</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bagian Bawah HUD Desktop (PC) -->
+            <div class="hidden md:flex items-center justify-between w-full max-w-6xl mx-auto gap-3">
+                <div class="glass-pill rounded-2xl px-4 py-2.5 flex items-center gap-5 text-xs pointer-events-auto">
+                    <div class="flex items-center gap-1.5 text-slate-300">
+                        <kbd class="px-2 py-1 bg-slate-800 border border-slate-600 rounded-md font-mono text-[11px] text-white">WASD</kbd>
+                        <span>/</span>
+                        <kbd class="px-2 py-1 bg-slate-800 border border-slate-600 rounded-md font-mono text-[11px] text-white">Panah</kbd>
+                        <span class="text-slate-400 ml-1">Gerak & Arah</span>
+                    </div>
+                    <div class="h-4 w-px bg-white/10"></div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="triggerPlayerShot('CLEAR')" class="px-2.5 py-1 bg-sky-500/20 hover:bg-sky-500/35 border border-sky-400/40 rounded-lg text-sky-200 font-semibold transition active:scale-95">
+                            <span class="font-mono text-white">[J / Spasi]</span> Lob
+                        </button>
+                        <button onclick="triggerPlayerShot('DROP')" class="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/40 rounded-lg text-emerald-200 font-semibold transition active:scale-95">
+                            <span class="font-mono text-white">[K / Shift]</span> Drop
+                        </button>
+                        <button onclick="triggerPlayerShot('SMASH')" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/40 rounded-lg text-amber-200 font-semibold transition active:scale-95">
+                            <span class="font-mono text-white">[L / Enter]</span> Smash
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-pill rounded-full px-4 py-1.5 flex items-center gap-2 text-xs text-slate-300 pointer-events-auto">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>Created by <strong class="text-white font-bold tracking-wide">Andika</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- MENU PENGATURAN PERTANDINGAN (Overlay Halaman 2) -->
+        <div id="main-menu" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-md">
+            <div class="glass-panel rounded-3xl max-w-lg w-full p-6 sm:p-8 text-center relative overflow-hidden">
+                <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-semibold mb-3">
+                    <span>Simulasi 3D oleh <strong class="text-white">Andika</strong></span>
+                </div>
+
+                <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-1">
+                    SMASH<span class="text-emerald-400">MASTER</span> 3D
+                </h2>
+                <p class="text-slate-400 text-xs sm:text-sm mb-6">
+                    Pilih tingkat kesulitan Bot AI & target poin untuk memulai pertandingan
+                </p>
+
+                <div class="space-y-4 text-left mb-7">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Tingkat Kesulitan Bot AI</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="selectDifficulty('EASY')" data-diff="EASY" class="diff-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition">
+                                Pemula
+                            </button>
+                            <button type="button" onclick="selectDifficulty('MEDIUM')" data-diff="MEDIUM" class="diff-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-emerald-400 bg-emerald-500/20 text-emerald-300 transition">
+                                Menengah
+                            </button>
+                            <button type="button" onclick="selectDifficulty('HARD')" data-diff="HARD" class="diff-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition">
+                                Pro BWF
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Format Poin Kemenangan</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" onclick="selectTargetPoints(11)" data-pts="11" class="pts-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition">
+                                11 Poin (Cepat)
+                            </button>
+                            <button type="button" onclick="selectTargetPoints(21)" data-pts="21" class="pts-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-emerald-400 bg-emerald-500/20 text-emerald-300 transition">
+                                21 Poin (Standar BWF)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="startGame()" class="btn-glow w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-base tracking-wide shadow-lg cursor-pointer">
+                    MULAI PERTANDINGAN
+                </button>
+            </div>
+        </div>
+
+        <!-- MODAL GAME OVER -->
+        <div id="gameover-modal" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md hidden">
+            <div class="glass-panel rounded-3xl max-w-md w-full p-7 text-center">
+                <div id="gameover-badge" class="inline-block px-3.5 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider mb-3 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                    PERTANDINGAN SELESAI
+                </div>
+                <h2 id="gameover-title" class="text-3xl font-extrabold text-white mb-1">KAMU MENANG!</h2>
+                <p id="gameover-subtitle" class="text-slate-400 text-sm mb-6">Permainan luar biasa di lapangan!</p>
+
+                <div class="bg-slate-900/80 border border-white/10 rounded-2xl p-4 mb-6 flex items-center justify-around">
+                    <div>
+                        <div class="text-xs font-bold text-sky-400 uppercase">Player</div>
+                        <div id="final-score-player" class="font-mono-score text-4xl font-extrabold text-white mt-1">21</div>
+                    </div>
+                    <div class="text-slate-500 font-bold text-lg">VS</div>
+                    <div>
+                        <div class="text-xs font-bold text-rose-400 uppercase">Bot AI</div>
+                        <div id="final-score-bot" class="font-mono-score text-4xl font-extrabold text-white mt-1">18</div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="switchPage('MATERI')" class="flex-1 py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-sm transition cursor-pointer">
+                        Baca Materi
+                    </button>
+                    <button onclick="startGame()" class="btn-glow flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-extrabold text-sm cursor-pointer">
+                        Main Lagi
+                    </button>
+                </div>
+
+                <div class="mt-5 text-[11px] text-slate-500">
+                    SmashMaster 3D • Dikembangkan oleh <span class="text-slate-300 font-semibold">Andika</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        /**
+         * ============================================================================
+         * BADMINTONHUB & SMASHMASTER 3D — APLIKASI EDUKASI & SIMULASI TERPADU
+         * Dikembangkan oleh: Andika
+         * ============================================================================
+         */
+
+        // --- MANAJEMEN HALAMAN (SPA VIEW-SWITCHER) & TEMA ---
+        let activePage = 'MATERI';
+        let isThreeInitialized = false;
+        let animationFrameId = null;
+        let isLightMode = false;
+        let arenaFloorMesh = null;
+
+        const isMobileDevice = () => window.innerWidth < 768 || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+
+        function checkDeviceOrientation() {
+            const hint = document.getElementById('portrait-hint');
+            if (!hint) return;
+            const isPortrait = window.innerHeight > window.innerWidth;
+            if (activePage === 'SIMULASI' && window.innerWidth < 768 && isPortrait) {
+                hint.classList.remove('hidden');
+            } else {
+                hint.classList.add('hidden');
+            }
+        }
+
+        function toggleTheme() {
+            isLightMode = !isLightMode;
+            document.body.classList.toggle('light-mode', isLightMode);
+
+            document.getElementById('icon-sun').classList.toggle('hidden', isLightMode);
+            document.getElementById('icon-moon').classList.toggle('hidden', !isLightMode);
+            document.getElementById('theme-label').textContent = isLightMode ? 'Gelap' : 'Terang';
+
+            if (scene) {
+                const bgHex = isLightMode ? 0xdbeafe : 0x090d16;
+                scene.background = new THREE.Color(bgHex);
+                scene.fog = new THREE.FogExp2(bgHex, 0.02);
+                if (arenaFloorMesh) {
+                    arenaFloorMesh.material.color.setHex(isLightMode ? 0x94a3b8 : 0x0f172a);
+                }
+            }
+            try { localStorage.setItem('badminton_theme', isLightMode ? 'light' : 'dark'); } catch (e) {}
+        }
+
+        function switchPage(pageName) {
+            if (activePage === pageName) return;
+            activePage = pageName;
+
+            const pageMateri = document.getElementById('page-materi');
+            const pageSimulasi = document.getElementById('page-simulasi');
+            const btnMateri = document.getElementById('nav-btn-materi');
+            const btnSimulasi = document.getElementById('nav-btn-simulasi');
+
+            if (pageName === 'MATERI') {
+                Object.keys(keys).forEach(k => keys[k] = false);
+                joystickVec.set(0, 0);
+                document.body.classList.remove('mode-simulasi');
+                document.body.classList.add('mode-materi');
+                pageMateri.classList.remove('hidden');
+                pageSimulasi.classList.add('hidden');
+                document.getElementById('portrait-hint').classList.add('hidden');
+
+                btnMateri.className = 'px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 bg-emerald-500 text-slate-950 shadow-md';
+                btnSimulasi.className = 'px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white';
+
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+            } else {
+                document.body.classList.remove('mode-materi');
+                document.body.classList.add('mode-simulasi');
+                pageMateri.classList.add('hidden');
+                pageSimulasi.classList.remove('hidden');
+                checkDeviceOrientation();
+
+                btnSimulasi.className = 'px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 bg-emerald-500 text-slate-950 shadow-md';
+                btnMateri.className = 'px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 text-slate-300 hover:text-white';
+
+                if (!isThreeInitialized) {
+                    initThreeScene();
+                    initTouchControls();
+                    isThreeInitialized = true;
+                }
+                requestAnimationFrame(() => {
+                    onWindowResize();
+                    lastTime = performance.now();
+                    if (!animationFrameId) {
+                        animate(lastTime);
+                    }
+                });
+            }
+        }
+
+        // --- LOGIKA FILTER TURNAMEN & KUIS (HALAMAN 1) ---
+        function filterTurnamen(cat) {
+            document.querySelectorAll('.tour-filter-btn').forEach(btn => {
+                const isMatch = (cat === 'ALL' && btn.textContent.includes('Semua')) ||
+                                (cat === 'DUNIA' && btn.textContent.includes('Dunia')) ||
+                                (cat === 'NASIONAL' && btn.textContent.includes('Nasional'));
+                btn.className = isMatch
+                    ? 'tour-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950'
+                    : 'tour-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white/10 text-slate-300';
+            });
+            document.querySelectorAll('.tour-card').forEach(card => {
+                card.classList.toggle('hidden', cat !== 'ALL' && card.dataset.cat !== cat);
+            });
+        }
+
+        const QUIZ_DATA = [
+            {
+                q: '1. Berapakah tinggi net bulu tangkis di bagian tengah lapangan sesuai standar resmi BWF?',
+                opts: ['1,524 meter', '1,750 meter', '1,400 meter'],
+                ans: 0
+            },
+            {
+                q: '2. Jenis pukulan melambung tinggi menuju garis belakang lapangan lawan disebut...',
+                opts: ['Drop Shot', 'Netting', 'Lob / Clear'],
+                ans: 2
+            },
+            {
+                q: '3. Dalam sistem rally point 3 × 21, apabila terjadi skor imbang 20–20 (deuce), maka pemain dinyatakan menang set apabila...',
+                opts: ['Mencapai poin 21 lebih dulu', 'Unggul selisih 2 poin (maksimal poin 30)', 'Melakukan servis ulang'],
+                ans: 1
+            }
+        ];
+        const quizAnswers = {};
+
+        function renderQuiz() {
+            const container = document.getElementById('quiz-container');
+            if (!container) return;
+            container.innerHTML = QUIZ_DATA.map((item, qIdx) => `
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <div class="font-bold text-sm text-white mb-3">${item.q}</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        ${item.opts.map((opt, oIdx) => `
+                            <button type="button" onclick="answerQuiz(${qIdx}, ${oIdx})" id="qbtn-${qIdx}-${oIdx}"
+                                class="text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 transition">
+                                ${opt}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function answerQuiz(qIdx, oIdx) {
+            if (quizAnswers[qIdx] !== undefined) return;
+            quizAnswers[qIdx] = oIdx;
+            const correctIdx = QUIZ_DATA[qIdx].ans;
+
+            QUIZ_DATA[qIdx].opts.forEach((_, idx) => {
+                const btn = document.getElementById(`qbtn-${qIdx}-${idx}`);
+                if (idx === correctIdx) {
+                    btn.className = 'text-left px-3.5 py-2.5 rounded-xl text-xs font-bold border border-emerald-400 bg-emerald-500/25 text-emerald-300';
+                } else if (idx === oIdx) {
+                    btn.className = 'text-left px-3.5 py-2.5 rounded-xl text-xs font-bold border border-rose-400 bg-rose-500/25 text-rose-300';
+                }
+            });
+
+            let score = 0;
+            Object.keys(quizAnswers).forEach(k => {
+                if (quizAnswers[k] === QUIZ_DATA[k].ans) score++;
+            });
+            document.getElementById('quiz-score-badge').textContent = `Skor Kuis: ${score} / ${QUIZ_DATA.length}`;
+        }
+
+        // --- KONSTANTA LAPANGAN STANDAR BWF (Dalam Meter) ---
+        const COURT = {
+            WIDTH: 6.10,
+            SINGLES_WIDTH: 5.18,
+            LENGTH: 13.40,
+            HALF_LENGTH: 6.70,
+            NET_HEIGHT_CENTER: 1.524,
+            NET_HEIGHT_POST: 1.55,
+            SERVICE_LINE_SHORT: 1.98,
+            SERVICE_LINE_LONG_DOUBLES: 0.76
+        };
+
+        const gameState = {
+            status: 'MENU',
+            difficulty: 'MEDIUM',
+            targetPoints: 21,
+            scorePlayer: 0,
+            scoreBot: 0,
+            server: 'PLAYER',
+            lastHitter: null,
+            rallyCount: 0,
+            cameraMode: 'BEHIND',
+            isMuted: false,
+            pointTimeout: null,
+            botServeTimer: 0
+        };
+
+        const AI_PROFILES = {
+            EASY: { speed: 4.3, reactionDelay: 0.22, errorMargin: 0.75, smashChance: 0.20, dropChance: 0.25 },
+            MEDIUM: { speed: 5.6, reactionDelay: 0.12, errorMargin: 0.38, smashChance: 0.45, dropChance: 0.30 },
+            HARD: { speed: 7.0, reactionDelay: 0.04, errorMargin: 0.14, smashChance: 0.68, dropChance: 0.25 }
+        };
+
+        // --- SISTEM AUDIO PROSEDURAL (WEB AUDIO API) ---
+        class SoundEngine {
+            constructor() { this.ctx = null; }
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+            playHit(type = 'CLEAR') {
+                if (gameState.isMuted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                if (type === 'SMASH') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.14);
+                    gain.gain.setValueAtTime(0.55, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                } else if (type === 'DROP') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(340, now);
+                    osc.frequency.exponentialRampToValueAtTime(180, now + 0.08);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+                } else {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(410, now);
+                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.11);
+                    gain.gain.setValueAtTime(0.38, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                }
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.16);
+            }
+            playNetHit() {
+                if (gameState.isMuted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(55, now + 0.18);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.19);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+            playScore(isPlayerPoint) {
+                if (gameState.isMuted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const notes = isPlayerPoint ? [523.25, 659.25, 783.99] : [392.00, 329.63];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+                    gain.gain.setValueAtTime(0.22, now + idx * 0.09);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.28);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.09);
+                    osc.stop(now + idx * 0.09 + 0.3);
+                });
+            }
+        }
+        const sound = new SoundEngine();
+
+        // --- VARIABEL THREE.JS & FISIKA ---
+        let scene, camera, renderer, cannonWorld;
+        let playerObj, botObj, shuttleObj, targetRing, shuttleShadow;
+        let trailMesh, trailPositions = [];
+        const TRAIL_LENGTH = 26;
+
+        const shuttlePhysics = {
+            pos: new THREE.Vector3(0, 1.3, 4.5),
+            vel: new THREE.Vector3(0, 0, 0),
+            isFlying: false,
+            dragCoeff: 0.24,
+            gravity: 12.8,
+            predictedLanding: new THREE.Vector3(0, 0, 0)
+        };
+
+        const playerState = {
+            pos: new THREE.Vector3(0, 0, 4.6),
+            vel: new THREE.Vector3(0, 0, 0),
+            speed: 6.4,
+            swingTimer: 0,
+            swingDuration: 0.28,
+            walkCycle: 0
+        };
+
+        const botState = {
+            pos: new THREE.Vector3(0, 0, -4.6),
+            targetPos: new THREE.Vector3(0, 0, -4.2),
+            swingTimer: 0,
+            swingDuration: 0.28,
+            walkCycle: 0,
+            reactionTimer: 0
+        };
+
+        const keys = {
+            w: false, a: false, s: false, d: false,
+            ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false
+        };
+        const joystickVec = new THREE.Vector2(0, 0);
+
+        // --- TEKSTUR LAPANGAN & NET PROSEDURAL ---
+        function createCourtTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 2048;
+            const ctx = canvas.getContext('2d');
+
+            const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, '#0f766e');
+            grad.addColorStop(0.5, '#0d9488');
+            grad.addColorStop(1, '#0f766e');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const padX = 90;
+            const padY = 120;
+            const w = canvas.width - padX * 2;
+            const h = canvas.height - padY * 2;
+            const scaleX = w / COURT.WIDTH;
+            const scaleZ = h / COURT.LENGTH;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            ctx.strokeStyle = '#f8fafc';
+            ctx.lineWidth = 8;
+            ctx.strokeRect(padX, padY, w, h);
+
+            const singlesOffset = ((COURT.WIDTH - COURT.SINGLES_WIDTH) / 2) * scaleX;
+            ctx.beginPath();
+            ctx.moveTo(padX + singlesOffset, padY);
+            ctx.lineTo(padX + singlesOffset, padY + h);
+            ctx.moveTo(padX + w - singlesOffset, padY);
+            ctx.lineTo(padX + w - singlesOffset, padY + h);
+            ctx.stroke();
+
+            const shortServPx = COURT.SERVICE_LINE_SHORT * scaleZ;
+            ctx.beginPath();
+            ctx.moveTo(padX, centerY - shortServPx);
+            ctx.lineTo(padX + w, centerY - shortServPx);
+            ctx.moveTo(padX, centerY + shortServPx);
+            ctx.lineTo(padX + w, centerY + shortServPx);
+            ctx.stroke();
+
+            const longServPx = COURT.SERVICE_LINE_LONG_DOUBLES * scaleZ;
+            ctx.beginPath();
+            ctx.moveTo(padX, padY + longServPx);
+            ctx.lineTo(padX + w, padY + longServPx);
+            ctx.moveTo(padX, padY + h - longServPx);
+            ctx.lineTo(padX + w, padY + h - longServPx);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(centerX, padY);
+            ctx.lineTo(centerX, centerY - shortServPx);
+            ctx.moveTo(centerX, centerY + shortServPx);
+            ctx.lineTo(centerX, padY + h);
+            ctx.stroke();
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = isMobileDevice() ? 4 : 8;
+            return texture;
+        }
+
+        function createNetTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.78)';
+            ctx.lineWidth = 2;
+            const step = 8;
+            for (let x = 0; x <= canvas.width; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 14);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 14; y <= canvas.height; y += step) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, 14);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.repeat.set(4, 1);
+            return tex;
+        }
+
+        function createPlayerCharacter(jerseyColor, isBot = false) {
+            const group = new THREE.Group();
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xf1c27d, roughness: 0.6 });
+            const jerseyMat = new THREE.MeshStandardMaterial({ color: jerseyColor, roughness: 0.45 });
+            const shortsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+            const shoeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.19, 0.62, 16), jerseyMat);
+            torso.position.y = 1.05;
+            torso.castShadow = true;
+            group.add(torso);
+
+            const pelvis = new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.20, 0.24, 16), shortsMat);
+            pelvis.position.y = 0.65;
+            pelvis.castShadow = true;
+            group.add(pelvis);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 20), skinMat);
+            head.position.y = 1.56;
+            head.castShadow = true;
+            group.add(head);
+
+            const headband = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.174, 0.174, 0.05, 20),
+                new THREE.MeshStandardMaterial({ color: isBot ? 0xfacc15 : 0x38bdf8 })
+            );
+            headband.position.y = 1.61;
+            group.add(headband);
+
+            const leftLeg = new THREE.Group();
+            leftLeg.position.set(-0.11, 0.55, 0);
+            const leftLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.06, 0.52, 12), skinMat);
+            leftLegMesh.position.y = -0.26;
+            leftLegMesh.castShadow = true;
+            const leftShoe = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.24), shoeMat);
+            leftShoe.position.set(0, -0.51, isBot ? 0.04 : -0.04);
+            leftLeg.add(leftLegMesh, leftShoe);
+            group.add(leftLeg);
+
+            const rightLeg = new THREE.Group();
+            rightLeg.position.set(0.11, 0.55, 0);
+            const rightLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.06, 0.52, 12), skinMat);
+            rightLegMesh.position.y = -0.26;
+            rightLegMesh.castShadow = true;
+            const rightShoe = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.08, 0.24), shoeMat);
+            rightShoe.position.set(0, -0.51, isBot ? 0.04 : -0.04);
+            rightLeg.add(rightLegMesh, rightShoe);
+            group.add(rightLeg);
+
+            const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.048, 0.48, 12), skinMat);
+            leftArm.position.set(-0.29, 1.12, 0);
+            leftArm.rotation.z = 0.28;
+            leftArm.castShadow = true;
+            group.add(leftArm);
+
+            const armPivot = new THREE.Group();
+            armPivot.position.set(0.28, 1.30, 0);
+
+            const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.05, 0.46, 12), skinMat);
+            rightArm.position.y = -0.22;
+            rightArm.castShadow = true;
+            armPivot.add(rightArm);
+
+            const racketGroup = new THREE.Group();
+            racketGroup.position.set(0, -0.44, 0);
+            racketGroup.rotation.x = isBot ? 0.6 : -0.6;
+
+            const grip = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.022, 0.024, 0.18, 10),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a })
+            );
+            grip.position.y = 0.06;
+            racketGroup.add(grip);
+
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.008, 0.008, 0.26, 8),
+                new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.8, roughness: 0.2 })
+            );
+            shaft.position.y = 0.26;
+            racketGroup.add(shaft);
+
+            const frameGeo = new THREE.TorusGeometry(0.13, 0.012, 10, 24);
+            const frameMat = new THREE.MeshStandardMaterial({
+                color: isBot ? 0xf43f5e : 0x38bdf8,
+                metalness: 0.6,
+                roughness: 0.25
+            });
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+            frame.scale.set(0.85, 1.18, 1);
+            frame.position.y = 0.53;
+            frame.castShadow = true;
+            racketGroup.add(frame);
+
+            const strings = new THREE.Mesh(
+                new THREE.CircleGeometry(0.125, 20),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+            );
+            strings.scale.set(0.85, 1.18, 1);
+            strings.position.y = 0.53;
+            racketGroup.add(strings);
+
+            armPivot.add(racketGroup);
+            armPivot.rotation.x = isBot ? -0.45 : 0.45;
+            group.add(armPivot);
+
+            group.userData = { leftLeg, rightLeg, armPivot };
+            return group;
+        }
+
+        function createShuttlecock() {
+            const shuttle = new THREE.Group();
+            const cork = new THREE.Mesh(
+                new THREE.SphereGeometry(0.032, 14, 14),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
+            );
+            cork.position.z = 0.03;
+            shuttle.add(cork);
+
+            const band = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.033, 0.033, 0.012, 14),
+                new THREE.MeshStandardMaterial({ color: 0xef4444 })
+            );
+            band.rotation.x = Math.PI / 2;
+            band.position.z = 0.018;
+            shuttle.add(band);
+
+            const skirt = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.068, 0.032, 0.085, 14, 1, true),
+                new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5, side: THREE.DoubleSide })
+            );
+            skirt.rotation.x = Math.PI / 2;
+            skirt.position.z = -0.032;
+            shuttle.add(skirt);
+
+            return shuttle;
+        }
+
+        // --- INISIALISASI SCENE 3D (HP & PC OPTIMIZED) ---
+        function initThreeScene() {
+            const container = document.getElementById('game-container');
+            const isMobile = isMobileDevice();
+            const bgHex = isLightMode ? 0xdbeafe : 0x090d16;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(bgHex);
+            scene.fog = new THREE.FogExp2(bgHex, 0.02);
+
+            const aspect = window.innerWidth / window.innerHeight;
+            const adaptiveFov = aspect < 1 ? 62 : 48;
+            camera = new THREE.PerspectiveCamera(adaptiveFov, aspect, 0.1, 100);
+            camera.position.set(0, 4.3, 11.2);
+            camera.lookAt(0, 1.1, -1.0);
+
+            renderer = new THREE.WebGLRenderer({
+                antialias: !isMobile,
+                powerPreference: 'high-performance'
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = isMobile ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.15;
+            container.appendChild(renderer.domElement);
+
+            cannonWorld = new CANNON.World();
+            cannonWorld.gravity.set(0, -12.8, 0);
+            const groundBody = new CANNON.Body({ mass: 0 });
+            groundBody.addShape(new CANNON.Plane());
+            groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+            cannonWorld.addBody(groundBody);
+
+            const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.65);
+            scene.add(ambientLight);
+
+            const mainSpot = new THREE.DirectionalLight(0xffffff, 1.15);
+            mainSpot.position.set(6, 14, 7);
+            mainSpot.castShadow = true;
+            const shadowRes = isMobile ? 1024 : 2048;
+            mainSpot.shadow.mapSize.width = shadowRes;
+            mainSpot.shadow.mapSize.height = shadowRes;
+            mainSpot.shadow.camera.near = 2;
+            mainSpot.shadow.camera.far = 32;
+            const d = 9.5;
+            mainSpot.shadow.camera.left = -d;
+            mainSpot.shadow.camera.right = d;
+            mainSpot.shadow.camera.top = d;
+            mainSpot.shadow.camera.bottom = -d;
+            mainSpot.shadow.bias = -0.0005;
+            scene.add(mainSpot);
+
+            const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.35);
+            rimLight.position.set(-7, 8, -9);
+            scene.add(rimLight);
+
+            arenaFloorMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(46, 46),
+                new THREE.MeshStandardMaterial({ color: isLightMode ? 0x94a3b8 : 0x0f172a, roughness: 0.85, metalness: 0.1 })
+            );
+            arenaFloorMesh.rotation.x = -Math.PI / 2;
+            arenaFloorMesh.position.y = -0.01;
+            arenaFloorMesh.receiveShadow = true;
+            scene.add(arenaFloorMesh);
+
+            const courtMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(COURT.WIDTH + 1.4, COURT.LENGTH + 2.0),
+                new THREE.MeshStandardMaterial({ map: createCourtTexture(), roughness: 0.55, metalness: 0.05 })
+            );
+            courtMesh.rotation.x = -Math.PI / 2;
+            courtMesh.receiveShadow = true;
+            scene.add(courtMesh);
+
+            const postMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 });
+            const postOffset = COURT.WIDTH / 2 + 0.15;
+            [-postOffset, postOffset].forEach(xPos => {
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, COURT.NET_HEIGHT_POST, 16), postMat);
+                post.position.set(xPos, COURT.NET_HEIGHT_POST / 2, 0);
+                post.castShadow = true;
+                scene.add(post);
+
+                const base = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.08, 16), postMat);
+                base.position.set(xPos, 0.04, 0);
+                scene.add(base);
+            });
+
+            const netHeight = 0.76;
+            const netMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(postOffset * 2, netHeight),
+                new THREE.MeshStandardMaterial({ map: createNetTexture(), transparent: true, side: THREE.DoubleSide, roughness: 0.8 })
+            );
+            netMesh.position.set(0, COURT.NET_HEIGHT_CENTER - netHeight / 2, 0);
+            scene.add(netMesh);
+
+            const backWall = new THREE.Mesh(
+                new THREE.BoxGeometry(18, 0.9, 0.3),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x064e3b, emissiveIntensity: 0.45 })
+            );
+            backWall.position.set(0, 0.45, -10.5);
+            scene.add(backWall);
+
+            playerObj = createPlayerCharacter(0x0284c7, false);
+            playerObj.position.copy(playerState.pos);
+            scene.add(playerObj);
+
+            botObj = createPlayerCharacter(0xe11d48, true);
+            botObj.position.copy(botState.pos);
+            scene.add(botObj);
+
+            shuttleObj = createShuttlecock();
+            scene.add(shuttleObj);
+
+            shuttleShadow = new THREE.Mesh(
+                new THREE.CircleGeometry(0.14, 16),
+                new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })
+            );
+            shuttleShadow.rotation.x = -Math.PI / 2;
+            shuttleShadow.position.y = 0.005;
+            scene.add(shuttleShadow);
+
+            targetRing = new THREE.Mesh(
+                new THREE.RingGeometry(0.16, 0.25, 24),
+                new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.75, side: THREE.DoubleSide })
+            );
+            targetRing.rotation.x = -Math.PI / 2;
+            targetRing.position.y = 0.008;
+            targetRing.visible = false;
+            scene.add(targetRing);
+
+            const trailGeo = new THREE.BufferGeometry();
+            trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_LENGTH * 3), 3));
+            trailMesh = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65 }));
+            scene.add(trailMesh);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onWindowResize() {
+            checkDeviceOrientation();
+            if (!camera || !renderer) return;
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.aspect = aspect;
+            camera.fov = aspect < 1 ? 62 : 48;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobileDevice() ? 1.5 : 2));
+        }
+
+        // --- KONTROL VIRTUAL JOYSTICK & MULTI-TOUCH UNTUK HP ---
+        function initTouchControls() {
+            const zone = document.getElementById('joystick-zone');
+            const knob = document.getElementById('joystick-knob');
+            if (!zone || !knob) return;
+
+            let activeTouchId = null;
+
+            const updateJoystick = (clientX, clientY) => {
+                const rect = zone.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const maxRadius = rect.width * 0.38;
+
+                let dx = clientX - centerX;
+                let dy = clientY - centerY;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist > maxRadius) {
+                    dx = (dx / dist) * maxRadius;
+                    dy = (dy / dist) * maxRadius;
+                }
+
+                knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                const normX = dx / maxRadius;
+                const normY = dy / maxRadius;
+                joystickVec.set(
+                    Math.abs(normX) > 0.12 ? normX : 0,
+                    Math.abs(normY) > 0.12 ? normY : 0
+                );
+            };
+
+            const resetJoystick = () => {
+                activeTouchId = null;
+                knob.style.transform = 'translate(-50%, -50%)';
+                joystickVec.set(0, 0);
+            };
+
+            zone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (activeTouchId === null && e.changedTouches.length > 0) {
+                    const touch = e.changedTouches[0];
+                    activeTouchId = touch.identifier;
+                    updateJoystick(touch.clientX, touch.clientY);
+                }
+            }, { passive: false });
+
+            zone.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeTouchId) {
+                        updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                        break;
+                    }
+                }
+            }, { passive: false });
+
+            zone.addEventListener('touchend', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeTouchId) {
+                        resetJoystick();
+                        break;
+                    }
+                }
+            });
+            zone.addEventListener('touchcancel', resetJoystick);
+
+            let isMouseDragging = false;
+            zone.addEventListener('mousedown', (e) => {
+                isMouseDragging = true;
+                updateJoystick(e.clientX, e.clientY);
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (isMouseDragging) updateJoystick(e.clientX, e.clientY);
+            });
+            window.addEventListener('mouseup', () => {
+                if (isMouseDragging) {
+                    isMouseDragging = false;
+                    resetJoystick();
+                }
+            });
+
+            document.querySelectorAll('.mobile-action-btn').forEach(btn => {
+                const shotType = btn.dataset.shot;
+                btn.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    btn.classList.add('is-pressed');
+                    triggerPlayerShot(shotType);
+                });
+                const releaseBtn = () => btn.classList.remove('is-pressed');
+                btn.addEventListener('pointerup', releaseBtn);
+                btn.addEventListener('pointercancel', releaseBtn);
+                btn.addEventListener('pointerleave', releaseBtn);
+            });
+        }
+
+        // --- PREDIKSI TITIK JATUH KOK ---
+        function predictShuttleLanding() {
+            if (!shuttlePhysics.isFlying) {
+                targetRing.visible = false;
+                return;
+            }
+            const simPos = shuttlePhysics.pos.clone();
+            const simVel = shuttlePhysics.vel.clone();
+            const dt = 0.025;
+
+            for (let i = 0; i < 160; i++) {
+                const speed = simVel.length();
+                const dragForce = simVel.clone().multiplyScalar(-shuttlePhysics.dragCoeff * speed);
+                simVel.addScaledVector(dragForce, dt);
+                simVel.y -= shuttlePhysics.gravity * dt;
+                simPos.addScaledVector(simVel, dt);
+
+                if (simPos.y <= 0.05) {
+                    shuttlePhysics.predictedLanding.set(simPos.x, 0.01, simPos.z);
+                    targetRing.position.set(simPos.x, 0.01, simPos.z);
+                    targetRing.visible = true;
+                    const isInside = Math.abs(simPos.x) <= COURT.WIDTH / 2 && Math.abs(simPos.z) <= COURT.HALF_LENGTH;
+                    targetRing.material.color.setHex(isInside ? 0xfacc15 : 0xf43f5e);
+                    return;
+                }
+            }
+        }
+
+        // --- MEKANIKA PUKULAN PEMAIN ---
+        function triggerPlayerShot(shotType) {
+            if (gameState.status !== 'SERVE' && gameState.status !== 'PLAYING') return;
+
+            playerState.swingTimer = playerState.swingDuration;
+
+            let aimDir = joystickVec.x;
+            if (keys.a || keys.ArrowLeft) aimDir -= 1;
+            if (keys.d || keys.ArrowRight) aimDir += 1;
+            aimDir = THREE.MathUtils.clamp(aimDir, -1, 1);
+
+            if (gameState.status === 'SERVE' && gameState.server === 'PLAYER') {
+                gameState.status = 'PLAYING';
+                gameState.lastHitter = 'PLAYER';
+                gameState.rallyCount = 1;
+                updateHUD();
+
+                const targetX = aimDir * 2.1 + (Math.random() - 0.5) * 0.4;
+                const targetZ = shotType === 'DROP' ? -2.4 : -5.3;
+
+                launchShuttleToward(shuttlePhysics.pos, new THREE.Vector3(targetX, 0, targetZ), shotType === 'DROP' ? 5.6 : 8.4);
+                sound.playHit(shotType);
+                showBanner(shotType === 'DROP' ? 'SERVIS PENDEK!' : 'SERVIS TINGGI!', 'text-sky-300');
+                return;
+            }
+
+            if (gameState.status === 'PLAYING' && gameState.lastHitter !== 'PLAYER') {
+                const hitCenter = new THREE.Vector3(playerState.pos.x + 0.15, 1.35, playerState.pos.z - 0.35);
+                const dist = hitCenter.distanceTo(shuttlePhysics.pos);
+
+                if (dist <= 1.90 && shuttlePhysics.pos.z > -0.25) {
+                    gameState.lastHitter = 'PLAYER';
+                    gameState.rallyCount++;
+                    updateHUD();
+
+                    let targetX = aimDir * 2.35 + (Math.random() - 0.5) * 0.35;
+                    targetX = THREE.MathUtils.clamp(targetX, -COURT.WIDTH / 2 + 0.25, COURT.WIDTH / 2 - 0.25);
+
+                    let apexHeight = 6.8;
+                    let targetZ = -5.6;
+                    let bannerText = 'CLEAR!';
+                    let bannerColor = 'text-sky-300';
+
+                    if (shotType === 'DROP') {
+                        apexHeight = 2.65;
+                        targetZ = -1.65;
+                        bannerText = 'DROP SHOT!';
+                        bannerColor = 'text-emerald-300';
+                    } else if (shotType === 'SMASH') {
+                        if (shuttlePhysics.pos.y >= 1.25) {
+                            apexHeight = Math.max(shuttlePhysics.pos.y + 0.15, 2.05);
+                            targetZ = -4.1;
+                            bannerText = 'JUMPING SMASH!!';
+                            bannerColor = 'text-amber-400';
+                            trailMesh.material.color.setHex(0xf59e0b);
+                        } else {
+                            apexHeight = 2.4;
+                            targetZ = -4.8;
+                            bannerText = 'DRIVE CEPAT!';
+                            bannerColor = 'text-amber-200';
+                        }
+                    }
+
+                    if (shotType !== 'SMASH') trailMesh.material.color.setHex(0x38bdf8);
+
+                    launchShuttleToward(shuttlePhysics.pos, new THREE.Vector3(targetX, 0, targetZ), apexHeight, shotType === 'SMASH');
+                    sound.playHit(shotType);
+                    showBanner(bannerText, bannerColor);
+                }
+            }
+        }
+
+        function launchShuttleToward(startPos, targetPos, peakHeight, isSmash = false) {
+            shuttlePhysics.isFlying = true;
+            const g = shuttlePhysics.gravity;
+            const hUp = Math.max(0.15, peakHeight - startPos.y);
+            const vy = Math.sqrt(2 * g * hUp);
+            const tUp = vy / g;
+            const tDown = Math.sqrt((2 * Math.max(0.2, peakHeight)) / g);
+            const totalTime = (tUp + tDown) * (isSmash ? 0.72 : 0.88);
+            const dragCompensation = isSmash ? 1.52 : 1.42;
+
+            const vx = ((targetPos.x - startPos.x) / totalTime) * dragCompensation;
+            const vz = ((targetPos.z - startPos.z) / totalTime) * dragCompensation;
+
+            shuttlePhysics.vel.set(vx, isSmash ? vy * 0.45 : vy, vz);
+            resetTrail();
+        }
+
+        // --- LOGIKA AI BOT & UPDATE PLAYER ---
+        function updateBotAI(dt) {
+            const profile = AI_PROFILES[gameState.difficulty];
+
+            if (gameState.status === 'SERVE' && gameState.server === 'BOT') {
+                gameState.botServeTimer -= dt;
+                botState.targetPos.set(0.4, 0, -3.6);
+                if (gameState.botServeTimer <= 0) {
+                    botState.swingTimer = botState.swingDuration;
+                    gameState.status = 'PLAYING';
+                    gameState.lastHitter = 'BOT';
+                    gameState.rallyCount = 1;
+                    updateHUD();
+
+                    const serveX = (Math.random() - 0.5) * 3.8;
+                    const isShort = Math.random() < 0.35;
+                    launchShuttleToward(shuttlePhysics.pos, new THREE.Vector3(serveX, 0, isShort ? 2.4 : 5.4), isShort ? 3.2 : 6.8);
+                    sound.playHit(isShort ? 'DROP' : 'CLEAR');
+                }
+            }
+
+            if (gameState.status === 'PLAYING') {
+                if (gameState.lastHitter === 'PLAYER' && shuttlePhysics.vel.z < 0) {
+                    botState.reactionTimer += dt;
+                    if (botState.reactionTimer >= profile.reactionDelay) {
+                        const pred = shuttlePhysics.predictedLanding;
+                        const targetZ = THREE.MathUtils.clamp(pred.z, -COURT.HALF_LENGTH + 0.4, -0.85);
+                        const targetX = THREE.MathUtils.clamp(pred.x, -COURT.WIDTH / 2 + 0.3, COURT.WIDTH / 2 - 0.3);
+                        botState.targetPos.set(targetX, 0, targetZ);
+                    }
+
+                    const botHitZone = new THREE.Vector3(botState.pos.x, 1.35, botState.pos.z + 0.35);
+                    const dist = botHitZone.distanceTo(shuttlePhysics.pos);
+
+                    if (dist <= 1.65 && shuttlePhysics.pos.z < -0.25 && shuttlePhysics.pos.y >= 0.65) {
+                        botState.swingTimer = botState.swingDuration;
+                        botState.reactionTimer = 0;
+                        gameState.lastHitter = 'BOT';
+                        gameState.rallyCount++;
+                        updateHUD();
+
+                        const rand = Math.random();
+                        let shotType = 'CLEAR';
+                        let apex = 6.6;
+                        let aimZ = 5.4;
+
+                        if (shuttlePhysics.pos.y > 1.55 && rand < profile.smashChance) {
+                            shotType = 'SMASH';
+                            apex = 2.0;
+                            aimZ = 4.2;
+                            trailMesh.material.color.setHex(0xf43f5e);
+                        } else if (rand < profile.smashChance + profile.dropChance) {
+                            shotType = 'DROP';
+                            apex = 2.6;
+                            aimZ = 1.75;
+                            trailMesh.material.color.setHex(0xfb7185);
+                        } else {
+                            trailMesh.material.color.setHex(0xfb7185);
+                        }
+
+                        const awayFromPlayerX = playerState.pos.x > 0 ? -1.9 : 1.9;
+                        const aimX = THREE.MathUtils.clamp(
+                            awayFromPlayerX + (Math.random() - 0.5) * profile.errorMargin * 2.5,
+                            -COURT.WIDTH / 2 + 0.25,
+                            COURT.WIDTH / 2 - 0.25
+                        );
+
+                        launchShuttleToward(shuttlePhysics.pos, new THREE.Vector3(aimX, 0, aimZ), apex, shotType === 'SMASH');
+                        sound.playHit(shotType);
+                        if (shotType === 'SMASH') showBanner('BOT SMASH!', 'text-rose-400');
+                    }
+                } else {
+                    botState.targetPos.set(0, 0, -3.9);
+                    botState.reactionTimer = 0;
+                }
+            }
+
+            const moveVec = new THREE.Vector3().subVectors(botState.targetPos, botState.pos);
+            moveVec.y = 0;
+            const distance = moveVec.length();
+
+            if (distance > 0.05) {
+                moveVec.normalize();
+                botState.pos.addScaledVector(moveVec, Math.min(distance, profile.speed * dt));
+                botState.walkCycle += dt * 14;
+            } else {
+                botState.walkCycle = 0;
+            }
+
+            botObj.position.copy(botState.pos);
+            animateCharacter(botObj, botState, dt, true);
+        }
+
+        function updatePlayer(dt) {
+            let moveX = joystickVec.x;
+            let moveZ = joystickVec.y;
+
+            if (keys.a || keys.ArrowLeft) moveX -= 1;
+            if (keys.d || keys.ArrowRight) moveX += 1;
+            if (keys.w || keys.ArrowUp) moveZ -= 1;
+            if (keys.s || keys.ArrowDown) moveZ += 1;
+
+            const moveDir = new THREE.Vector3(moveX, 0, moveZ);
+            if (moveDir.lengthSq() > 1) moveDir.normalize();
+
+            if (moveDir.lengthSq() > 0.001) {
+                playerState.pos.addScaledVector(moveDir, playerState.speed * dt);
+                playerState.walkCycle += dt * 15;
+            } else {
+                playerState.walkCycle = 0;
+            }
+
+            playerState.pos.x = THREE.MathUtils.clamp(playerState.pos.x, -COURT.WIDTH / 2 - 0.35, COURT.WIDTH / 2 + 0.35);
+            playerState.pos.z = THREE.MathUtils.clamp(playerState.pos.z, 0.55, COURT.HALF_LENGTH + 0.55);
+
+            playerObj.position.copy(playerState.pos);
+            animateCharacter(playerObj, playerState, dt, false);
+        }
+
+        function animateCharacter(meshGroup, state, dt, isBot) {
+            const { leftLeg, rightLeg, armPivot } = meshGroup.userData;
+            if (state.walkCycle > 0) {
+                leftLeg.rotation.x = Math.sin(state.walkCycle) * 0.55;
+                rightLeg.rotation.x = -Math.sin(state.walkCycle) * 0.55;
+            } else {
+                leftLeg.rotation.x = THREE.MathUtils.lerp(leftLeg.rotation.x, 0, dt * 10);
+                rightLeg.rotation.x = THREE.MathUtils.lerp(rightLeg.rotation.x, 0, dt * 10);
+            }
+
+            if (state.swingTimer > 0) {
+                state.swingTimer -= dt;
+                const progress = 1 - (state.swingTimer / state.swingDuration);
+                const swingAngle = Math.sin(progress * Math.PI) * 2.1;
+                armPivot.rotation.x = isBot ? (-0.45 + swingAngle) : (0.45 - swingAngle);
+            } else {
+                const restAngle = isBot ? -0.45 : 0.45;
+                armPivot.rotation.x = THREE.MathUtils.lerp(armPivot.rotation.x, restAngle, dt * 12);
+            }
+        }
+
+        function updateShuttlePhysics(dt) {
+            if (gameState.status === 'SERVE') {
+                const t = performance.now() * 0.004;
+                if (gameState.server === 'PLAYER') {
+                    shuttlePhysics.pos.set(playerState.pos.x + 0.22, 1.15 + Math.sin(t) * 0.05, playerState.pos.z - 0.42);
+                    shuttleObj.rotation.set(-0.4, 0, 0);
+                } else {
+                    shuttlePhysics.pos.set(botState.pos.x - 0.22, 1.15 + Math.sin(t) * 0.05, botState.pos.z + 0.42);
+                    shuttleObj.rotation.set(0.4, Math.PI, 0);
+                }
+                shuttleObj.position.copy(shuttlePhysics.pos);
+                shuttleShadow.position.set(shuttlePhysics.pos.x, 0.005, shuttlePhysics.pos.z);
+                targetRing.visible = false;
+                return;
+            }
+
+            if (!shuttlePhysics.isFlying || gameState.status !== 'PLAYING') return;
+
+            const prevZ = shuttlePhysics.pos.z;
+            const speed = shuttlePhysics.vel.length();
+            if (speed > 0.001) {
+                const drag = shuttlePhysics.vel.clone().multiplyScalar(-shuttlePhysics.dragCoeff * speed);
+                shuttlePhysics.vel.addScaledVector(drag, dt);
+            }
+            shuttlePhysics.vel.y -= shuttlePhysics.gravity * dt;
+            shuttlePhysics.pos.addScaledVector(shuttlePhysics.vel, dt);
+
+            if (shuttlePhysics.vel.lengthSq() > 0.05) {
+                shuttleObj.lookAt(shuttlePhysics.pos.clone().add(shuttlePhysics.vel));
+            }
+
+            shuttleObj.position.copy(shuttlePhysics.pos);
+            shuttleShadow.position.set(shuttlePhysics.pos.x, 0.005, shuttlePhysics.pos.z);
+            const shadowScale = Math.max(0.4, 1 - shuttlePhysics.pos.y * 0.12);
+            shuttleShadow.scale.set(shadowScale, shadowScale, 1);
+
+            updateTrail();
+
+            if ((prevZ > 0 && shuttlePhysics.pos.z <= 0) || (prevZ < 0 && shuttlePhysics.pos.z >= 0)) {
+                if (shuttlePhysics.pos.y < COURT.NET_HEIGHT_CENTER - 0.02 && Math.abs(shuttlePhysics.pos.x) <= COURT.WIDTH / 2 + 0.2) {
+                    sound.playNetHit();
+                    shuttlePhysics.vel.set(shuttlePhysics.vel.x * 0.1, -1.5, -shuttlePhysics.vel.z * 0.15);
+                    const winner = gameState.lastHitter === 'PLAYER' ? 'BOT' : 'PLAYER';
+                    handlePointScored(winner, 'NYANGKUT NET!');
+                    return;
+                }
+            }
+
+            if (shuttlePhysics.pos.y <= 0.04) {
+                shuttlePhysics.pos.y = 0.04;
+                shuttleObj.position.copy(shuttlePhysics.pos);
+                shuttlePhysics.isFlying = false;
+
+                const isInsideCourt = Math.abs(shuttlePhysics.pos.x) <= COURT.WIDTH / 2 && Math.abs(shuttlePhysics.pos.z) <= COURT.HALF_LENGTH;
+                if (isInsideCourt) {
+                    const winner = shuttlePhysics.pos.z < 0 ? 'PLAYER' : 'BOT';
+                    handlePointScored(winner, winner === 'PLAYER' ? 'MASUK! +1 POIN' : 'BOLA MASUK!');
+                } else {
+                    const winner = gameState.lastHitter === 'PLAYER' ? 'BOT' : 'PLAYER';
+                    handlePointScored(winner, 'OUT! BOLA KELUAR');
+                }
+            }
+        }
+
+        function resetTrail() {
+            trailPositions = [];
+            for (let i = 0; i < TRAIL_LENGTH; i++) trailPositions.push(shuttlePhysics.pos.clone());
+        }
+
+        function updateTrail() {
+            trailPositions.pop();
+            trailPositions.unshift(shuttlePhysics.pos.clone());
+            const attr = trailMesh.geometry.attributes.position;
+            for (let i = 0; i < TRAIL_LENGTH; i++) {
+                const p = trailPositions[i] || shuttlePhysics.pos;
+                attr.setXYZ(i, p.x, p.y, p.z);
+            }
+            attr.needsUpdate = true;
+        }
+
+        function handlePointScored(winner, reasonText) {
+            if (gameState.status === 'POINT_DELAY' || gameState.status === 'GAMEOVER') return;
+            gameState.status = 'POINT_DELAY';
+            shuttlePhysics.isFlying = false;
+            targetRing.visible = false;
+
+            if (winner === 'PLAYER') {
+                gameState.scorePlayer++;
+                gameState.server = 'PLAYER';
+                sound.playScore(true);
+                showBanner(reasonText, 'text-emerald-400');
+            } else {
+                gameState.scoreBot++;
+                gameState.server = 'BOT';
+                sound.playScore(false);
+                showBanner(reasonText, 'text-rose-400');
+            }
+
+            updateHUD();
+
+            const target = gameState.targetPoints;
+            const p = gameState.scorePlayer;
+            const b = gameState.scoreBot;
+            const maxCap = target === 21 ? 30 : 15;
+
+            const playerWon = (p >= target && p - b >= 2) || p >= maxCap;
+            const botWon = (b >= target && b - p >= 2) || b >= maxCap;
+
+            if (playerWon || botWon) {
+                gameState.pointTimeout = setTimeout(() => endMatch(playerWon), 1200);
+            } else {
+                gameState.pointTimeout = setTimeout(() => prepareNextServe(), 1350);
+            }
+        }
+
+        function prepareNextServe() {
+            gameState.status = 'SERVE';
+            gameState.lastHitter = null;
+            gameState.rallyCount = 0;
+            resetTrail();
+
+            const serverScore = gameState.server === 'PLAYER' ? gameState.scorePlayer : gameState.scoreBot;
+            const isEven = serverScore % 2 === 0;
+
+            if (gameState.server === 'PLAYER') {
+                playerState.pos.set(isEven ? 1.1 : -1.1, 0, 3.6);
+                botState.pos.set(isEven ? -1.1 : 1.1, 0, -3.8);
+                document.getElementById('serve-prompt').classList.remove('hidden');
+            } else {
+                playerState.pos.set(isEven ? 1.1 : -1.1, 0, 3.8);
+                botState.pos.set(isEven ? -1.1 : 1.1, 0, -3.5);
+                gameState.botServeTimer = 1.1;
+                document.getElementById('serve-prompt').classList.add('hidden');
+            }
+            updateHUD();
+        }
+
+        function endMatch(playerWon) {
+            gameState.status = 'GAMEOVER';
+            document.getElementById('serve-prompt').classList.add('hidden');
+            document.getElementById('final-score-player').textContent = gameState.scorePlayer;
+            document.getElementById('final-score-bot').textContent = gameState.scoreBot;
+
+            const titleEl = document.getElementById('gameover-title');
+            const subEl = document.getElementById('gameover-subtitle');
+            if (playerWon) {
+                titleEl.textContent = 'KAMU JUARA!';
+                titleEl.className = 'text-3xl font-extrabold text-emerald-400 mb-1';
+                subEl.textContent = 'Kemenangan gemilang di arena SmashMaster 3D!';
+            } else {
+                titleEl.textContent = 'KALAH TIPIS!';
+                titleEl.className = 'text-3xl font-extrabold text-rose-400 mb-1';
+                subEl.textContent = 'Bot AI bermain sangat agresif. Ayo balas di pertandingan berikutnya!';
+            }
+            document.getElementById('gameover-modal').classList.remove('hidden');
+        }
+
+        function updateCamera(dt) {
+            const isPortrait = window.innerHeight > window.innerWidth;
+            if (gameState.cameraMode === 'BEHIND') {
+                const targetCamX = playerState.pos.x * 0.48;
+                const targetCamY = isPortrait ? 4.85 : 4.15;
+                const targetCamZ = isPortrait ? 12.4 : 10.6;
+
+                camera.position.x = THREE.MathUtils.lerp(camera.position.x, targetCamX, dt * 4.5);
+                camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetCamY, dt * 4.5);
+                camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetCamZ, dt * 4.5);
+
+                camera.lookAt(playerState.pos.x * 0.25, 1.15, -1.2);
+            } else {
+                const sideDist = isPortrait ? 14.5 : 11.8;
+                camera.position.lerp(new THREE.Vector3(sideDist, 5.4, 0.5), dt * 4);
+                camera.lookAt(0, 1.1, 0);
+            }
+        }
+
+        let lastTime = 0;
+        function animate(now = 0) {
+            if (activePage !== 'SIMULASI') {
+                animationFrameId = null;
+                return;
+            }
+            animationFrameId = requestAnimationFrame(animate);
+
+            const dt = Math.min((now - lastTime) / 1000, 0.05);
+            lastTime = now;
+
+            if (cannonWorld) cannonWorld.step(1 / 60, dt, 3);
+
+            if (gameState.status !== 'MENU') {
+                updatePlayer(dt);
+                updateBotAI(dt);
+                updateShuttlePhysics(dt);
+                predictShuttleLanding();
+                updateCamera(dt);
+            } else {
+                const angle = now * 0.00025;
+                camera.position.set(Math.sin(angle) * 10.5, 4.8, Math.cos(angle) * 10.5);
+                camera.lookAt(0, 1.0, 0);
+            }
+
+            if (gameState.status === 'PLAYING') {
+                document.getElementById('serve-prompt').classList.add('hidden');
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function selectDifficulty(diff) {
+            gameState.difficulty = diff;
+            document.querySelectorAll('.diff-btn').forEach(btn => {
+                btn.className = btn.dataset.diff === diff
+                    ? 'diff-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-emerald-400 bg-emerald-500/20 text-emerald-300 transition'
+                    : 'diff-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition';
+            });
+        }
+
+        function selectTargetPoints(pts) {
+            gameState.targetPoints = pts;
+            document.querySelectorAll('.pts-btn').forEach(btn => {
+                btn.className = parseInt(btn.dataset.pts) === pts
+                    ? 'pts-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-emerald-400 bg-emerald-500/20 text-emerald-300 transition'
+                    : 'pts-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition';
+            });
+        }
+
+        function startGame() {
+            sound.init();
+            clearTimeout(gameState.pointTimeout);
+
+            gameState.scorePlayer = 0;
+            gameState.scoreBot = 0;
+            gameState.server = 'PLAYER';
+            gameState.rallyCount = 0;
+
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+            document.getElementById('hud-layer').classList.remove('hidden');
+            document.getElementById('target-points-display').textContent = gameState.targetPoints;
+
+            prepareNextServe();
+        }
+
+        function returnToMenu() {
+            clearTimeout(gameState.pointTimeout);
+            gameState.status = 'MENU';
+            shuttlePhysics.isFlying = false;
+            if (targetRing) targetRing.visible = false;
+
+            document.getElementById('hud-layer').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+        }
+
+        function updateHUD() {
+            document.getElementById('score-player').textContent = gameState.scorePlayer;
+            document.getElementById('score-bot').textContent = gameState.scoreBot;
+            document.getElementById('rally-counter').textContent = `Reli: ${gameState.rallyCount}`;
+
+            const pBadge = document.getElementById('serve-badge-player');
+            const bBadge = document.getElementById('serve-badge-bot');
+            if (gameState.server === 'PLAYER') {
+                pBadge.classList.remove('hidden');
+                bBadge.classList.add('hidden');
+            } else {
+                pBadge.classList.add('hidden');
+                bBadge.classList.remove('hidden');
+            }
+        }
+
+        function showBanner(text, colorClass = 'text-white') {
+            const container = document.getElementById('feedback-container');
+            const el = document.createElement('div');
+            el.className = `banner-animate font-extrabold text-2xl sm:text-4xl tracking-wider uppercase drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)] whitespace-nowrap ${colorClass}`;
+            el.textContent = text;
+            container.innerHTML = '';
+            container.appendChild(el);
+        }
+
+        function toggleCameraMode() {
+            gameState.cameraMode = gameState.cameraMode === 'BEHIND' ? 'BROADCAST' : 'BEHIND';
+            document.getElementById('camera-label').textContent =
+                gameState.cameraMode === 'BEHIND' ? 'Kamera: Belakang' : 'Kamera: Samping TV';
+        }
+
+        function toggleMute() {
+            gameState.isMuted = !gameState.isMuted;
+            document.getElementById('icon-sound-on').classList.toggle('hidden', gameState.isMuted);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', !gameState.isMuted);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (activePage !== 'SIMULASI') return;
+            const key = e.key;
+            if (key in keys) keys[key] = true;
+            if (key.toLowerCase() in keys) keys[key.toLowerCase()] = true;
+
+            if (key === 'Escape' && (gameState.status === 'SERVE' || gameState.status === 'PLAYING')) {
+                returnToMenu();
+                return;
+            }
+
+            if (gameState.status === 'SERVE' || gameState.status === 'PLAYING') {
+                if (key === ' ' || key.toLowerCase() === 'j') {
+                    e.preventDefault();
+                    triggerPlayerShot('CLEAR');
+                } else if (key === 'Shift' || key.toLowerCase() === 'k') {
+                    e.preventDefault();
+                    triggerPlayerShot('DROP');
+                } else if (key === 'Enter' || key.toLowerCase() === 'l') {
+                    e.preventDefault();
+                    triggerPlayerShot('SMASH');
+                } else if (key.toLowerCase() === 'c') {
+                    toggleCameraMode();
+                } else if (key.toLowerCase() === 'm') {
+                    toggleMute();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key;
+            if (key in keys) keys[key] = false;
+            if (key.toLowerCase() in keys) keys[key.toLowerCase()] = false;
+        });
+
+        window.addEventListener('orientationchange', () => {
+            setTimeout(onWindowResize, 150);
+        });
+
+        window.onload = function () {
+            renderQuiz();
+            try {
+                if (localStorage.getItem('badminton_theme') === 'light') {
+                    toggleTheme();
+                }
+            } catch (e) {}
+        };
+    </script>
+</body>
+</html>
